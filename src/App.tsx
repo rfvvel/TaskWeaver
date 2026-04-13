@@ -6,7 +6,7 @@ import Register from './pages/auth/Register';
 
 import { Layout } from './components/layout/Layout'; 
 import { Dashboard } from './pages/dashboard/Dashboard';
-
+import { MyTasks } from './pages/mytask/MyTask';
 
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="p-8 flex flex-col items-center justify-center h-full text-center">
@@ -27,7 +27,7 @@ function App() {
 
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/tasks" element={<PlaceholderPage title="My Tasks" />} />
+          <Route path="/tasks" element={<MyTasks />} />
           <Route path="/ai-distribution" element={<PlaceholderPage title="AI Distribution" />} />
           <Route path="/calendar" element={<PlaceholderPage title="Calendar" />} />
           <Route path="/activity" element={<PlaceholderPage title="Team Activity" />} />
