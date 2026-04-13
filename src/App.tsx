@@ -36,7 +36,7 @@ function App() {
           <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
         </Route>
 
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/" element={<Navigate to="/register" replace />} />
       </Routes>
     </BrowserRouter>
   );
