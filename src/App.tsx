@@ -7,6 +7,8 @@ import Register from './pages/auth/Register';
 import { Layout } from './components/layout/Layout'; 
 import { Dashboard } from './pages/dashboard/Dashboard';
 import { MyTasks } from './pages/mytask/MyTask';
+import { AIDistribution } from './pages/ai_distribution/AIDistribution'
+import { Calendar  } from './pages/calender/Calender'
 
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="p-8 flex flex-col items-center justify-center h-full text-center">
