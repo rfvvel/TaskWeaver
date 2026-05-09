@@ -10,6 +10,11 @@ import { MyTasks } from './pages/mytask/MyTask';
 import { AIDistribution } from './pages/ai_distribution/AIDistribution'
 import { Calendar  } from './pages/calender/Calender'
 
+import { Chat } from './pages/chat/Chat';
+import { Files } from './pages/files/Files';
+import { Settings } from './pages/settings/Settings'
+import { TeamActivity } from './pages/teamActivity/TeamActivity';
+
 const PlaceholderPage = ({ title }: { title: string }) => (
   <div className="p-8 flex flex-col items-center justify-center h-full text-center">
     <div className="w-16 h-16 bg-indigo-100 rounded-2xl flex items-center justify-center mb-4">
@@ -30,12 +35,12 @@ function App() {
         <Route element={<Layout />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/tasks" element={<MyTasks />} />
-          <Route path="/ai-distribution" element={<PlaceholderPage title="AI Distribution" />} />
-          <Route path="/calendar" element={<PlaceholderPage title="Calendar" />} />
-          <Route path="/activity" element={<PlaceholderPage title="Team Activity" />} />
-          <Route path="/files" element={<PlaceholderPage title="Files" />} />
-          <Route path="/chat" element={<PlaceholderPage title="Chat" />} />
-          <Route path="/settings" element={<PlaceholderPage title="Settings" />} />
+          <Route path="/ai-distribution" element={<AIDistribution />} />
+          <Route path="/calendar" element={<Calendar />} />
+          <Route path="/activity" element={<TeamActivity />} />
+          <Route path="/files" element={<Files />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/settings" element={<Settings />} />
         </Route>
 
         <Route path="/" element={<Navigate to="/register" replace />} />
