@@ -82,7 +82,7 @@ export function Layout() {
         <div className="p-4 border-t border-border">
           <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors">
             <Avatar className="w-9 h-9">
-              <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=rafael" />
+              {/* <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=rafael" /> */}
               <AvatarFallback>RD</AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
@@ -115,9 +115,9 @@ export function Layout() {
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuContent align="end" className="w-56 bg-white z-50 shadow-lg border-slate-300" >
                 <DropdownMenuLabel>Switch Team</DropdownMenuLabel>
-                <DropdownMenuSeparator />
+                <DropdownMenuSeparator className="bg-slate-300"/>
                 <DropdownMenuItem>CS Project Team</DropdownMenuItem>
                 <DropdownMenuItem>Marketing Campaign</DropdownMenuItem>
                 <DropdownMenuItem>BINUS Blockchain Club</DropdownMenuItem>
