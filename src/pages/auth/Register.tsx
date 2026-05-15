@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,6 +21,7 @@ const registerSchema = z.object({
 type RegisterFormInputs = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
+  const navigate = useNavigate()
   const {
     register,
     handleSubmit,
@@ -31,6 +32,7 @@ export default function RegisterPage() {
 
   const onSubmit = (data: RegisterFormInputs) => {
     console.log("Data Pendaftaran siap dikirim ke Node.js Backend:", data);
+    navigate('/login');
     // fetch() register ke backend disini geng
   };
 

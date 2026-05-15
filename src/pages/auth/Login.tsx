@@ -24,9 +24,25 @@ export default function LoginPage() {
   });
 
   const onSubmit = (data: LoginFormInputs) => {
-    console.log("Data kekirim", data);
-    navigate('/dashboard');
-    // api nanti disini geng
+    //api nanti disini
+    console.log("Data terkirim", data);
+    
+    const mockApiResponse = {
+      status: "success",
+      user: {
+        id: 1,
+        name: "Rafael",
+        hasTeam: false //  true/false
+      }
+    };
+
+    if (mockApiResponse.user.hasTeam === true) {
+      console.log("User sudah punya tim, masuk ke Dashboard.");
+      navigate('/dashboard');
+    } else {
+      console.log("User belum punya tim, masuk ke Onboarding.");
+      navigate('/onboarding');
+    }
   };
 
   return (
@@ -34,9 +50,9 @@ export default function LoginPage() {
       <div className="flex items-center gap-2">
         <div className="flex items-center justify-center gap-3 mb-5">
           <img 
-          src={LogoTW2} 
-          alt="TaskWeaver Logo" 
-          className="w-12 h-12 object-cover rounded-md mix-blend-multiply" 
+            src={LogoTW2} 
+            alt="TaskWeaver Logo" 
+            className="w-12 h-12 object-cover rounded-md mix-blend-multiply" 
           />
           <span className="text-3xl font-bold text-blue-600 leading-none">
             TaskWeaver AI
@@ -66,7 +82,7 @@ export default function LoginPage() {
             <label className="block text-sm font-medium text-slate-700 mb-1">Password</label>
             <input 
               type="password" 
-              {...register("password")} // Sambungkan ke Zod
+              {...register("password")} 
               className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all ${
                 errors.password ? 'border-red-500' : 'border-gray-200'
               }`}

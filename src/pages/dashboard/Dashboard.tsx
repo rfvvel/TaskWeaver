@@ -32,21 +32,21 @@ const overviewStats = [
     value: "42%",
     change: "Balanced",
     icon: TrendingUp,
-    gradient: "from-indigo-500 to-purple-500"
+    gradient: "from-blue-500 to-cyan-500"
   },
   {
     title: "Team Progress",
     value: "68%",
     change: "+12% this week",
     icon: Users,
-    gradient: "from-purple-500 to-pink-500"
+    gradient: "from-blue-500 to-cyan-500"
   },
   {
     title: "Deadlines",
     value: "3",
     change: "Next 7 days",
     icon: CalendarIcon,
-    gradient: "from-orange-500 to-red-500"
+    gradient: "from-blue-500 to-cyan-500"
   },
 ];
 
@@ -54,7 +54,6 @@ const teamMembers = [
   {
     id: 1,
     name: "Sarah Chen",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
     role: "UI Designer",
     skills: ["UI Design", "Prototyping"],
     workload: 38,
@@ -64,7 +63,6 @@ const teamMembers = [
   {
     id: 2,
     name: "Michael Rodriguez",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=michael",
     role: "Backend Dev",
     skills: ["Backend", "API Design"],
     workload: 52,
@@ -74,7 +72,6 @@ const teamMembers = [
   {
     id: 3,
     name: "Emily Watson",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emily",
     role: "Frontend Dev",
     skills: ["Frontend", "React"],
     workload: 45,
@@ -84,7 +81,6 @@ const teamMembers = [
   {
     id: 4,
     name: "David Kim",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
     role: "Project Manager",
     skills: ["Proposal", "Documentation"],
     workload: 28,
@@ -94,7 +90,6 @@ const teamMembers = [
   {
     id: 5,
     name: "Alex Johnson",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alex",
     role: "QA Engineer",
     skills: ["Testing", "Quality Assurance"],
     workload: 65,
@@ -119,8 +114,6 @@ export function Dashboard() {
       setDistributionStatus("complete");
     }, 2000);
   };
-
-  // --- Helper Functions ---
 
   const getWorkloadColor = (workload: number) => {
     if (workload < 35) return "text-blue-600";
