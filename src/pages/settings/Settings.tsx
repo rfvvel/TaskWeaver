@@ -28,7 +28,7 @@ export function Settings() {
           </TabsTrigger>
           <TabsTrigger value="ai" className="rounded-lg gap-2">
             <Zap className="w-4 h-4" />
-            AI Settings
+            Skills
           </TabsTrigger>
           <TabsTrigger value="appearance" className="rounded-lg gap-2">
             <Palette className="w-4 h-4" />
@@ -49,7 +49,7 @@ export function Settings() {
             <CardContent className="space-y-6">
               <div className="flex items-center gap-6">
                 <Avatar className="w-20 h-20">
-                  <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=user" />
+                  {/* <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=user" /> */}
                   <AvatarFallback>JD</AvatarFallback>
                 </Avatar>
                 <div className="space-y-2">
@@ -77,8 +77,8 @@ export function Settings() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Input id="role" defaultValue="Team Lead" className="rounded-xl" />
+                <Label htmlFor="role">Phone Number</Label>
+                <Input id="role" defaultValue="" className="rounded-xl" />
               </div>
 
               <div className="space-y-2">
