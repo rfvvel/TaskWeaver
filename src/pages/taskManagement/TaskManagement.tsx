@@ -1,6 +1,9 @@
 import { useState } from "react";
-import { useOutletContext } from "react-router-dom"; // navigate dihapus karena tidak butuh pindah halaman lagi
-import { Plus, Edit, Trash2, Calendar as CalendarIcon, ListChecks, Users, Sparkles, Loader2 } from "lucide-react"; 
+import { useOutletContext } from "react-router-dom";
+import { 
+  Plus, Edit, Trash2, Calendar as CalendarIcon, ListChecks, 
+  Users, Sparkles, Loader2, UploadCloud, FileText, X, Paperclip 
+} from "lucide-react"; 
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -51,6 +54,7 @@ interface Task {
   team: string;
   title: string;
   description: string;
+  attachment: string | null; 
   difficulty: "easy" | "medium" | "hard" | "expert";
   dueDate: Date;
   assignedTo: string | null;
@@ -68,6 +72,7 @@ export function TaskManagement() {
       team: "Marketing Campaign",
       title: "Membuat Video Iklan Campaign",
       description: "Produksi video iklan berdurasi 30 detik untuk peluncuran fitur baru di Instagram dan TikTok.",
+      attachment: null,
       difficulty: "hard",
       dueDate: new Date("2026-05-20"),
       assignedTo: "Tim Kreatif",
@@ -83,7 +88,8 @@ export function TaskManagement() {
       id: "2",
       team: "Marketing Campaign", 
       title: "Presentasi Matematika SMP",
-      description: "Menyiapkan materi dan presentasi untuk acara edukasi anak SMP binaan CSR.",
+      description: "Menyiapkan materi dan presentasi untuk acara edukasi anak SMP binaan CSR. Silakan pelajari file terlampir untuk pedomannya.",
+      attachment: "Panduan_Acara_CSR.pdf", 
       difficulty: "medium",
       dueDate: new Date("2026-05-15"),
       assignedTo: null,
@@ -101,11 +107,10 @@ export function TaskManagement() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   
-  // STATE BARU: Untuk efek loading saat Gemini API berjalan
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
 
   const [formData, setFormData] = useState<Partial<Task>>({
-    title: "", description: "", difficulty: "medium", dueDate: new Date(), tags: [], status: "todo", subtasks: []
+    title: "", description: "", attachment: null, difficulty: "medium", dueDate: new Date(), tags: [], status: "todo", subtasks: []
   });
 
   const handleCreateTask = () => {
@@ -114,6 +119,7 @@ export function TaskManagement() {
       team: activeTeam, 
       title: formData.title || "",
       description: formData.description || "",
+      attachment: formData.attachment || null,
       difficulty: formData.difficulty || "medium",
       dueDate: formData.dueDate || new Date(),
       assignedTo: null, 
@@ -139,7 +145,7 @@ export function TaskManagement() {
   };
 
   const resetForm = () => {
-    setFormData({ title: "", description: "", difficulty: "medium", dueDate: new Date(), tags: [], status: "todo", subtasks: [] });
+    setFormData({ title: "", description: "", attachment: null, difficulty: "medium", dueDate: new Date(), tags: [], status: "todo", subtasks: [] });
   };
 
   const openEditDialog = (task: Task) => {
@@ -159,31 +165,37 @@ export function TaskManagement() {
     setDetailsOpen(true);
   };
 
+ 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const fileName = e.target.files[0].name;
+      setFormData({ ...formData, attachment: fileName });
+    }
+  };
+
+  const removeAttachment = () => {
+    setFormData({ ...formData, attachment: null });
+  };
+
   const getDifficultyColor = (difficulty: string) => {
     switch (difficulty) {
       case "expert": return "bg-purple-600"; case "hard": return "bg-red-600"; case "medium": return "bg-blue-600"; case "easy": return "bg-green-600"; default: return "bg-gray-600";
     }
   };
 
-  // --- FUNGSI MANGGIL API GEMINI ---
   const handleRunAI = () => {
     setIsGeneratingAI(true);
-    
-    // Simulasi memanggil API Gemini selama 2.5 detik
     setTimeout(() => {
       const aiGeneratedSubtasks: SubTask[] = [
         { id: Date.now() + "a", title: "Riset dan Kumpulkan Materi Presentasi", assignedTo: "Evan Varian", avatarSeed: "evan", status: "todo" },
         { id: Date.now() + "b", title: "Desain Slide Presentasi (PPT) Menarik", assignedTo: "Lie Darren", avatarSeed: "darren", status: "todo" },
         { id: Date.now() + "c", title: "Latihan Public Speaking di depan Tim", assignedTo: "Steven Nathaniel", avatarSeed: "steven", status: "todo" }
       ];
-
-      // Update state
       if (selectedTask) {
         const updatedTask = { ...selectedTask, subtasks: aiGeneratedSubtasks };
         setSelectedTask(updatedTask);
         setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t));
       }
-      
       setIsGeneratingAI(false);
     }, 2500);
   };
@@ -200,7 +212,6 @@ export function TaskManagement() {
         </Button>
       </div>
 
-      {/* MODAL FORM TASK */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="rounded-2xl max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
@@ -216,8 +227,37 @@ export function TaskManagement() {
               <Label htmlFor="description">Description</Label>
               <Textarea id="description" placeholder="Describe the overall goal of this task..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="rounded-xl min-h-[100px]" />
             </div>
+
+            <div className="space-y-2">
+              <Label>Reference Material (PDF/Docs)</Label>
+              {!formData.attachment ? (
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <UploadCloud className="w-8 h-8 text-slate-400 mb-2" />
+                    <p className="text-sm text-slate-500"><span className="font-semibold text-blue-600">Click to upload</span> or drag and drop</p>
+                    <p className="text-xs text-slate-400 mt-1">PDF, DOCX, or Images (Max 10MB)</p>
+                  </div>
+                  <input type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.png,.jpg" />
+                </label>
+              ) : (
+                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-xl bg-slate-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-slate-700">{formData.attachment}</span>
+                      <span className="text-xs text-slate-400">Ready to upload</span>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={removeAttachment} className="text-slate-400 hover:text-red-500">
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
             
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4 pt-2">
               <div className="space-y-2">
                 <Label htmlFor="difficulty">Overall Difficulty</Label>
                 <Select value={formData.difficulty} onValueChange={(value) => setFormData({ ...formData, difficulty: value as any })}>
@@ -266,7 +306,6 @@ export function TaskManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL DETAIL TASK & SUBTASKS (AREA KERJA AI) */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="rounded-2xl max-w-3xl bg-white transition-all">
           {selectedTask && (
@@ -277,6 +316,19 @@ export function TaskManagement() {
                 </div>
                 <DialogTitle className="text-2xl">{selectedTask.title}</DialogTitle>
                 <DialogDescription className="text-base mt-2 text-slate-700">{selectedTask.description}</DialogDescription>
+                
+                {/* --- MENAMPILKAN ATTACHMENT JIKA ADA --- */}
+                {selectedTask.attachment && (
+                  <div className="mt-4 p-3 border border-slate-200 rounded-xl bg-slate-50 flex items-center gap-3 w-fit pr-8">
+                    <div className="w-10 h-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center">
+                      <FileText className="w-5 h-5" />
+                    </div>
+                    <div className="flex flex-col flex-1">
+                      <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Reference File</span>
+                      <span className="text-sm font-semibold text-blue-600 hover:underline cursor-pointer">{selectedTask.attachment}</span>
+                    </div>
+                  </div>
+                )}
               </DialogHeader>
               
               <div className="py-4 space-y-4 border-t mt-4">
@@ -287,18 +339,16 @@ export function TaskManagement() {
 
                 <div className="grid gap-3 min-h-[150px]">
                   
-                  {/* --- KONDISI 1: AI SEDANG LOADING --- */}
                   {isGeneratingAI && (
                     <div className="flex flex-col items-center justify-center py-10 bg-slate-50/50 rounded-xl border border-slate-200">
                       <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-                      <p className="text-slate-700 font-medium">Gemini AI is analyzing...</p>
+                      <p className="text-slate-700 font-medium">Gemini AI is reading attachment and analyzing...</p>
                       <p className="text-slate-500 text-sm mt-1 text-center max-w-sm">
                         Breaking down task and finding the best team members based on their skill matrix.
                       </p>
                     </div>
                   )}
 
-                  {/* --- KONDISI 2: TUGAS KOSONG & TIDAK LOADING --- */}
                   {!isGeneratingAI && selectedTask.subtasks.length === 0 && (
                     <div className="flex flex-col items-center justify-center py-10 bg-slate-50/50 rounded-xl border border-dashed border-slate-300">
                       <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center mb-3">
@@ -306,7 +356,7 @@ export function TaskManagement() {
                       </div>
                       <p className="text-slate-700 font-medium">Belum ada pecahan sub-task.</p>
                       <p className="text-slate-500 text-sm mt-1 mb-5 text-center max-w-sm">
-                        Biarkan AI membaca deskripsi tugas ini dan membagikannya secara otomatis ke anggota tim.
+                        Biarkan AI membaca deskripsi tugas dan <span className="font-semibold text-slate-700">file referensi</span>, lalu membagikannya otomatis ke tim.
                       </p>
                       <Button 
                         onClick={handleRunAI} 
@@ -317,7 +367,6 @@ export function TaskManagement() {
                     </div>
                   )}
 
-                  {/* --- KONDISI 3: SUB-TASK SUDAH ADA --- */}
                   {!isGeneratingAI && selectedTask.subtasks.map((sub) => (
                     <div key={sub.id} className="flex items-center justify-between p-4 border rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors animate-in fade-in slide-in-from-bottom-2">
                       <div className="flex items-center gap-3">
@@ -355,7 +404,11 @@ export function TaskManagement() {
                 <div className="flex-1 space-y-3">
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-lg group-hover:text-indigo-600 transition-colors">{task.title}</h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-lg group-hover:text-indigo-600 transition-colors">{task.title}</h3>
+                        {/* Menampilkan Ikon klip jika ada file */}
+                        {task.attachment && <Paperclip className="w-4 h-4 text-slate-400" />}
+                      </div>
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{task.description}</p>
                     </div>
                   </div>
