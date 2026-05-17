@@ -18,7 +18,8 @@ interface Team { id: string; name: string; description: string; inviteCode: stri
 
 const navItems = [
   { path: "/dashboard", label: "Dashboard", icon: LayoutDashboard }, { path: "/tasks", label: "My Tasks", icon: ListTodo },
-  // { path: "/ai-distribution", label: "AI Distribution", icon: Brain }, { path: "/calendar", label: "Calendar", icon: CalendarIcon },
+  // { path: "/ai-distribution", label: "AI Distribution", icon: Brain }, 
+  { path: "/calendar", label: "Calendar", icon: CalendarIcon },
   { path: "/activity", label: "Team Activity", icon: Activity }, { path: "/files", label: "Files", icon: FolderOpen },
   { path: "/chat", label: "Chat", icon: MessageSquare }, { path: "/team-management", label: "Team Management", icon: Users },
   { path: "/task-management", label: "Task Management", icon: ClipboardList }, { path: "/settings", label: "Settings", icon: SettingsIcon },

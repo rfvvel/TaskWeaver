@@ -223,9 +223,8 @@ export function Chat() {
     }
   };
 
-  // ── Guard: no teams ────────────────────────────────────────────────────────
 
-  if (teams.length === 0) {
+ if (teams.length === 0) {
     return (
       <div className="p-6 h-[calc(100vh-8rem)] flex items-center justify-center">
         <div className="flex flex-col items-center text-center max-w-sm">
@@ -237,19 +236,18 @@ export function Chat() {
               <span className="text-lg">💬</span>
             </div>
           </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Belum ada tim yang diikuti</h2>
+          <h2 className="text-xl font-bold text-slate-800 mb-2">You haven't joined any team yet</h2>
           <p className="text-sm text-slate-500 leading-relaxed mb-6">
-            Fitur Chat hanya tersedia dalam konteks tim. Bergabunglah atau buat tim
-            terlebih dahulu, lalu kamu bisa mulai berdiskusi di channel bersama anggota lain.
+            The Chat feature is only available within a team context. Join or create a team first, then you can start discussing in channels with other members.
           </p>
           <Button
             onClick={() => navigate("/team-management")}
             className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white gap-2 w-full"
           >
-            <UserPlus className="w-4 h-4" /> Buat atau Gabung Tim
+            <UserPlus className="w-4 h-4" /> Create or Join a Team
           </Button>
           <p className="text-xs text-slate-400 mt-3">
-            Setelah bergabung, Chat akan langsung tersedia di sini.
+            Once joined, Chat will be available right here.
           </p>
         </div>
       </div>
