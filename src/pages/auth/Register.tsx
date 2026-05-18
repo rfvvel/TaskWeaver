@@ -23,7 +23,7 @@ type RegisterFormInputs = z.infer<typeof registerSchema>;
 export default function RegisterPage() {
   const navigate = useNavigate();
   
-  // State untuk efek loading dan pesan error dari backend
+  // State loading / pesan error dari BE
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState("");
 
@@ -40,13 +40,12 @@ export default function RegisterPage() {
     setServerError("");
 
     try {
-      // Menembak data ke Endpoint Backend (Express)
+      // Nembak data ke Endpoint Backend (Express)
       const response = await fetch("http://localhost:3000/api/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        // Kita hanya mengirim data yang dibutuhkan Backend (confirmPassword tidak dikirim)
         body: JSON.stringify({
           fullName: data.fullName,
           email: data.email,
@@ -58,7 +57,7 @@ export default function RegisterPage() {
       const result = await response.json();
 
       if (response.ok) {
-        // Jika status 201 (Sukses)
+        // Jika Sukses
         alert(result.pesan || "Register Berhasil! Silakan Login.");
         navigate('/login');
       } else {
