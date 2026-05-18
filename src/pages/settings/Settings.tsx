@@ -99,14 +99,14 @@ const TASK_PREF_OPTIONS = [
 ];
 
 const defaultSkills: Skill[] = [
-  { id: "s1", name: "React",         category: "Frontend",      level: "Advanced" },
-  { id: "s2", name: "TypeScript",    category: "Frontend",      level: "Intermediate" },
-  { id: "s3", name: "Node.js",       category: "Backend",       level: "Intermediate" },
-  { id: "s4", name: "PostgreSQL",    category: "Database",      level: "Beginner" },
-  { id: "s5", name: "Figma",         category: "UI/UX Design",  level: "Intermediate" },
-  { id: "s6", name: "Communication", category: "Soft Skill",    level: "Advanced" },
-  { id: "s7", name: "Git & GitHub",  category: "DevOps / Cloud",level: "Intermediate" },
-  { id: "s8", name: "Jest / Vitest", category: "Testing / QA",  level: "Beginner" },
+  // { id: "s1", name: "React",         category: "Frontend",      level: "Advanced" },
+  // { id: "s2", name: "TypeScript",    category: "Frontend",      level: "Intermediate" },
+  // { id: "s3", name: "Node.js",       category: "Backend",       level: "Intermediate" },
+  // { id: "s4", name: "PostgreSQL",    category: "Database",      level: "Beginner" },
+  // { id: "s5", name: "Figma",         category: "UI/UX Design",  level: "Intermediate" },
+  // { id: "s6", name: "Communication", category: "Soft Skill",    level: "Advanced" },
+  // { id: "s7", name: "Git & GitHub",  category: "DevOps / Cloud",level: "Intermediate" },
+  // { id: "s8", name: "Jest / Vitest", category: "Testing / QA",  level: "Beginner" },
 ];
 
 const defaultWorkPrefs: WorkPrefs = {

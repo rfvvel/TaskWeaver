@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Users, PlusCircle, ArrowRight, Building2, AlignLeft } from "lucide-react";
+import { Users, PlusCircle, ArrowRight, Building2, AlignLeft, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -16,53 +16,143 @@ export function Team() {
   
   const [teamNameError, setTeamNameError] = useState("");
   const [joinCodeError, setJoinCodeError] = useState("");
+  
+  // State untuk efek loading saat nembak API
+  const [isCreating, setIsCreating] = useState(false);
+  const [isJoining, setIsJoining] = useState(false);
 
+  // Fungsi untuk mengambil data user yang sedang login dari localStorage
+  const getLoggedInUser = () => {
+    const userStr = localStorage.getItem("user");
+    return userStr ? JSON.parse(userStr) : null;
+  };
+
+  // Fungsi untuk men-generate Invite Code unik (e.g., TW-8X9P2)
   const generateRandomCode = () => {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; let result = 'TW-';
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; 
+    let result = 'TW-';
     for (let i = 0; i < 5; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
     return result;
   };
 
-  const handleCreateTeam = () => {
+  // 1. SKENARIO CREATE TEAM
+  const handleCreateTeam = async () => {
     if (!teamName.trim()) {
       setTeamNameError("Team Name tidak boleh kosong!");
       return; 
     }
-    
-    // 1. Ambil data lama dari LocalStorage
-    const savedTeams = localStorage.getItem("tw_teams");
-    const currentTeams = savedTeams ? JSON.parse(savedTeams) : [];
 
-    // 2. Buat objek tim baru
-    const newTeam = {
-      id: `team-${Date.now()}`,
-      name: teamName,
-      description: teamDesc || "No description provided.",
-      inviteCode: generateRandomCode(),
-      bigTasks: [],
-      members: [
-        { id: `m-${Date.now()}`, name: "Rafael Vvel", email: "rafael.vvel@gmail.com", role: "admin", avatarSeed: "rafael", joinDate: `Joined ${new Date().toLocaleDateString()}` }
-      ]
-    };
+    const user = getLoggedInUser();
+    if (!user) {
+      alert("Sesi login tidak ditemukan. Silakan login ulang.");
+      navigate("/login");
+      return;
+    }
 
-    // 3. Simpan gabungan data lama dan baru ke LocalStorage
-    currentTeams.push(newTeam);
-    localStorage.setItem("tw_teams", JSON.stringify(currentTeams));
-    
-    // 4. Jadikan tim baru ini sebagai tim aktif di Dropdown
-    localStorage.setItem("tw_activeTeam", teamName);
+    setIsCreating(true);
+    setTeamNameError("");
 
-    navigate("/team-management");
+    // Generate kode unik
+    const generatedCode = generateRandomCode(); 
+
+    try {
+      // Tembak ke API groupCreate di backend
+      const response = await fetch("http://localhost:3000/api/groupCreate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_name: teamName,
+          user_id: user.UserID, // REVISI: Menggunakan UserID dari UserModel
+          group_description: teamDesc || "No description provided.",
+          invite_code: generatedCode // Kirim invite code ke backend
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Simpan nama tim ke localStorage sementara agar tampilan Dropdown tahu tim yang aktif
+        localStorage.setItem("tw_activeTeam", teamName);
+        // alert(`Tim berhasil dibuat! Invite Code tim kamu adalah: ${generatedCode}\n\n(Simpan kode ini untuk mengundang anggota lain)`);
+        navigate("/team-management");
+      } else {
+        setTeamNameError(result.pesan || "Gagal membuat tim.");
+      }
+    } catch (error) {
+      console.error("Error Create Team:", error);
+      setTeamNameError("Tidak bisa terhubung ke server backend.");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const handleJoinTeam = () => {
+  // 2. SKENARIO JOIN TEAM
+  const handleJoinTeam = async () => {
     if (!joinCode.trim()) {
       setJoinCodeError("Invite Code tidak boleh kosong!");
       return; 
     }
-    // Simulasi Join Team
-    navigate("/team-management");
+
+    const user = getLoggedInUser();
+    if (!user) {
+      alert("Sesi login tidak ditemukan. Silakan login ulang.");
+      navigate("/login");
+      return;
+    }
+
+    setIsJoining(true);
+    setJoinCodeError("");
+
+    try {
+      // Langkah A: Cari Group ID berdasarkan Invite Code
+      const resCheck = await fetch("http://localhost:3000/api/groupGetGroupbyInviteCode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invite_code: joinCode })
+      });
+
+      const resultCheck = await resCheck.json();
+
+      if (!resCheck.ok || !resultCheck.data) {
+        setJoinCodeError(resultCheck.pesan || "Invite Code tidak ditemukan atau tidak valid.");
+        setIsJoining(false);
+        return;
+      }
+
+      // Ambil ID dari response data (Menyesuaikan field dari database Supabase-mu)
+      const groupId = resultCheck.data.id || resultCheck.data.group_id;
+
+      // Langkah B: Jika ketemu, langsung join ke grup tersebut
+      const resJoin = await fetch("http://localhost:3000/api/groupJoin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          group_id: groupId,
+          user_id: user.UserID, // REVISI: Menggunakan UserID dari UserModel
+          user_role: "member" // Set baku role sebagai member biasa saat join lewat kode
+        })
+      });
+
+      const resultJoin = await resJoin.json();
+
+      if (resJoin.ok) {
+        alert("Berhasil bergabung ke dalam tim!");
+        navigate("/team-management");
+      } else {
+        setJoinCodeError(resultJoin.pesan || "Gagal bergabung ke tim.");
+      }
+
+    } catch (error) {
+      console.error("Error Join Team:", error);
+      setJoinCodeError("Tidak bisa terhubung ke server backend.");
+    } finally {
+      setIsJoining(false);
+    }
   };
+
+  // Tampilkan data dinamis untuk nama user yang menyapa di atas
+  const currentUser = getLoggedInUser();
+  const displayName = currentUser ? currentUser.UserFullName : "Guest"; // REVISI: Menggunakan UserFullName
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
@@ -71,11 +161,13 @@ export function Team() {
           <img src={LogoTW2} alt="TaskWeaver Logo" className="w-12 h-12 object-cover rounded-xl shadow-sm mix-blend-multiply" />
           <h1 className="text-3xl font-bold text-blue-600">TaskWeaver AI</h1>
         </div>
-        <h2 className="text-2xl font-semibold text-slate-900">Welcome aboard, Rafael!</h2>
+        <h2 className="text-2xl font-semibold text-slate-900">Welcome aboard, {displayName}!</h2>
         <p className="text-slate-500 mt-2 max-w-md">To get started, you need to either create a new workspace for your team or join an existing one.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
+        
+        {/* --- KOTAK CREATE TEAM --- */}
         <Card className="border-border shadow-sm hover:shadow-md transition-all hover:border-blue-200">
           <CardHeader>
             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 text-blue-600"><PlusCircle className="w-6 h-6" /></div>
@@ -92,12 +184,21 @@ export function Team() {
               <label className="text-sm font-medium text-slate-700">Description <span className="text-slate-400 font-normal">(Optional)</span></label>
               <div className="relative"><AlignLeft className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" /><Input placeholder="e.g. Final Project for Software Engineering" className="bg-white pl-9" value={teamDesc} onChange={(e) => setTeamDesc(e.target.value)} /></div>
             </div>
-            <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-2" onClick={handleCreateTeam}>
-              Create Team & Continue <ArrowRight className="w-4 h-4 ml-2" />
+            <Button 
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-2 flex items-center justify-center" 
+              onClick={handleCreateTeam}
+              disabled={isCreating}
+            >
+              {isCreating ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating...</>
+              ) : (
+                <>Create Team & Continue <ArrowRight className="w-4 h-4 ml-2" /></>
+              )}
             </Button>
           </CardContent>
         </Card>
 
+        {/* --- KOTAK JOIN TEAM --- */}
         <Card className="border-border shadow-sm hover:shadow-md transition-all hover:border-indigo-200">
           <CardHeader>
             <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4 text-indigo-600"><Users className="w-6 h-6" /></div>
@@ -111,8 +212,17 @@ export function Team() {
                {joinCodeError && <p className="text-xs text-red-500 font-medium">{joinCodeError}</p>}
             </div>
             <div className="h-[72px]"></div> 
-            <Button variant="outline" className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50 mt-2" onClick={handleJoinTeam}>
-              Join Team <Building2 className="w-4 h-4 ml-2" />
+            <Button 
+              variant="outline" 
+              className="w-full border-indigo-200 text-indigo-700 hover:bg-indigo-50 mt-2 flex items-center justify-center" 
+              onClick={handleJoinTeam}
+              disabled={isJoining}
+            >
+              {isJoining ? (
+                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying Code...</>
+              ) : (
+                <>Join Team <Building2 className="w-4 h-4 ml-2" /></>
+              )}
             </Button>
           </CardContent>
         </Card>

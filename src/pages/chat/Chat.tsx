@@ -62,10 +62,10 @@ interface Channel {
 
 const SEED_CHANNELS: Channel[] = [
   { id: "c-general",       name: "general",       isPrivate: false, isDefault: true },
-  { id: "c-development",   name: "development",   isPrivate: false, isDefault: true },
-  { id: "c-design",        name: "design",        isPrivate: false, isDefault: true },
-  { id: "c-testing",       name: "testing",       isPrivate: false, isDefault: true },
-  { id: "c-project-leads", name: "project-leads", isPrivate: true,  isDefault: true },
+  // { id: "c-development",   name: "development",   isPrivate: false, isDefault: true },
+  // { id: "c-design",        name: "design",        isPrivate: false, isDefault: true },
+  // { id: "c-testing",       name: "testing",       isPrivate: false, isDefault: true },
+  // { id: "c-project-leads", name: "project-leads", isPrivate: true,  isDefault: true },
 ];
 
 const STATUS_CYCLE = ["online", "online", "away", "online", "offline"] as const;
@@ -479,7 +479,7 @@ export function Chat() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                {/* <div className="flex items-center gap-2 shrink-0">
                   <Button
                     variant={callState === "voice" ? "default" : "outline"}
                     size="icon"
@@ -496,7 +496,7 @@ export function Chat() {
                   >
                     <Video className="w-4 h-4" />
                   </Button>
-                </div>
+                </div> */}
               </div>
 
               {/* Call Banner */}
@@ -603,9 +603,9 @@ export function Chat() {
               {/* Message Input */}
               <div className="p-4 border-t border-border shrink-0">
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="icon" className="rounded-xl shrink-0">
+                  {/* <Button variant="ghost" size="icon" className="rounded-xl shrink-0">
                     <Paperclip className="w-5 h-5" />
-                  </Button>
+                  </Button> */}
                   <div className="flex-1 relative">
                     <Input
                       placeholder={`Message #${selectedChannel?.name ?? "…"}`}
@@ -614,12 +614,12 @@ export function Chat() {
                       onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && handleSend()}
                       className="rounded-xl pr-10"
                     />
-                    <Button
+                    {/* <Button
                       variant="ghost" size="icon"
                       className="absolute right-1 top-1/2 -translate-y-1/2 rounded-lg"
                     >
                       <Smile className="w-4 h-4" />
-                    </Button>
+                    </Button> */}
                   </div>
                   <Button
                     onClick={handleSend}

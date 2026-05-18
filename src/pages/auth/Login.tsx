@@ -68,7 +68,7 @@ export default function LoginPage() {
       }
     } catch (error) {
       console.error("Gagal koneksi ke backend:", error);
-      setServerError("Tidak bisa terhubung ke server. Pastikan backend sudah menyala.");
+      setServerError("Tidak bisa terhubung ke server.");
     } finally {
       setIsLoading(false);
     }
