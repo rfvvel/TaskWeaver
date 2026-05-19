@@ -147,9 +147,9 @@ export function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "Team Members", value: team.members.length.toString(), sub: `${team.members.filter(m => m.role === "admin").length} admin(s)`, Icon: Users, accent: "bg-blue-500" },
-          { label: "Total Tasks", value: totalTasks > 0 ? totalTasks.toString() : "—", sub: totalTasks > 0 ? `${inProgressTasks} in progress` : "No tasks yet", Icon: Target, accent: "bg-indigo-500" },
-          { label: "Sprint Progress", value: totalTasks > 0 ? `${sprintProgress}%` : "—", sub: totalTasks > 0 ? `${completedTasks} of ${totalTasks} done` : "Create tasks first", Icon: TrendingUp, accent: "bg-cyan-500" },
-          { label: "My Deadlines", value: myDeadlines.length.toString(), sub: `${myDeadlines.filter(d => d.priority === "high").length} high priority`, Icon: CalendarIcon, accent: "bg-orange-500" },
+          { label: "Total Tasks", value: totalTasks > 0 ? totalTasks.toString() : "—", sub: totalTasks > 0 ? `${inProgressTasks} in progress` : "No tasks yet", Icon: Target, accent: "bg-blue-500" },
+          { label: "Progress", value: totalTasks > 0 ? `${sprintProgress}%` : "—", sub: totalTasks > 0 ? `${completedTasks} of ${totalTasks} done` : "Create tasks first", Icon: TrendingUp, accent: "bg-blue-500" },
+          { label: "My Deadlines", value: myDeadlines.length.toString(), sub: `${myDeadlines.filter(d => d.priority === "high").length} high priority`, Icon: CalendarIcon, accent: "bg-blue-500" },
         ].map((s) => (
           <Card key={s.label} className="border-border bg-white shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-5">

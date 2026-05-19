@@ -17,7 +17,7 @@ const activities = [
   },
   {
     id: 2,
-    user: "Alex Johnson",
+    user: "Lie Darren",
     // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alex",
     action: "uploaded file",
     target: "test-results-final.pdf",
@@ -26,7 +26,7 @@ const activities = [
   },
   {
     id: 3,
-    user: "Michael Rodriguez",
+    user: "Evan Varian",
     // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=michael",
     action: "commented on",
     target: "API Integration Testing",
@@ -36,7 +36,7 @@ const activities = [
   },
   {
     id: 4,
-    user: "Emily Watson",
+    user: "Rafael Wijaya",
     // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emily",
     action: "started working on",
     target: "User profile components",
@@ -46,7 +46,7 @@ const activities = [
   },
   {
     id: 5,
-    user: "David Kim",
+    user: "Kevin Mahardika",
     // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
     action: "updated",
     target: "Project proposal document",
@@ -66,7 +66,7 @@ const activities = [
   },
   {
     id: 7,
-    user: "Alex Johnson",
+    user: "Lie Darren",
     // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alex",
     action: "completed task",
     target: "Set up testing environment",
@@ -213,7 +213,7 @@ export function TeamActivity() {
               <div key={idx} className="space-y-2">
                 <div className="flex items-center gap-3">
                   <Avatar className="w-9 h-9">
-                    <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${member.avatar}`} />
+                    {/* <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${member.avatar}`} /> */}
                     <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
