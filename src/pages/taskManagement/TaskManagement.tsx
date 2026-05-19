@@ -517,10 +517,10 @@ export function TaskManagement() {
       {/* Empty state */}
       {currentTeamTasks.length === 0 && (
         <Card className="rounded-2xl border-dashed border-2 bg-transparent shadow-none mt-8">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="w-14 h-14 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-4 shadow-sm">
+          <CardContent className="flex flex-col items-center justify-center py-5">
+            {/* <div className="w-14 h-14 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-4 shadow-sm">
               <Plus className="w-6 h-6" />
-            </div>
+            </div> */}
             <h3 className="font-semibold text-xl mb-1 text-slate-900">No Tasks Yet</h3>
             <p className="text-sm text-slate-500">
               Create the first task for <span className="font-semibold text-slate-700">{activeTeam}</span>.

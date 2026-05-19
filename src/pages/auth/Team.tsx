@@ -35,7 +35,6 @@ export function Team() {
     return result;
   };
 
-  // 1. SKENARIO CREATE TEAM
   const handleCreateTeam = async () => {
     if (!teamName.trim()) {
       setTeamNameError("Team Name tidak boleh kosong!");
@@ -52,28 +51,24 @@ export function Team() {
     setIsCreating(true);
     setTeamNameError("");
 
-    // Generate kode unik
     const generatedCode = generateRandomCode(); 
 
     try {
-      // Tembak ke API groupCreate di backend
       const response = await fetch("http://localhost:3000/api/groupCreate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           group_name: teamName,
-          user_id: user.UserID, // REVISI: Menggunakan UserID dari UserModel
+          user_id: user.UserID, 
           group_description: teamDesc || "No description provided.",
-          invite_code: generatedCode // Kirim invite code ke backend
+          invite_code: generatedCode 
         })
       });
 
       const result = await response.json();
 
       if (response.ok) {
-        // Simpan nama tim ke localStorage sementara agar tampilan Dropdown tahu tim yang aktif
         localStorage.setItem("tw_activeTeam", teamName);
-        // alert(`Tim berhasil dibuat! Invite Code tim kamu adalah: ${generatedCode}\n\n(Simpan kode ini untuk mengundang anggota lain)`);
         navigate("/team-management");
       } else {
         setTeamNameError(result.pesan || "Gagal membuat tim.");
@@ -86,7 +81,6 @@ export function Team() {
     }
   };
 
-  // 2. SKENARIO JOIN TEAM
   const handleJoinTeam = async () => {
     if (!joinCode.trim()) {
       setJoinCodeError("Invite Code tidak boleh kosong!");
@@ -104,7 +98,6 @@ export function Team() {
     setJoinCodeError("");
 
     try {
-      // Langkah A: Cari Group ID berdasarkan Invite Code
       const resCheck = await fetch("http://localhost:3000/api/groupGetGroupbyInviteCode", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -119,17 +112,15 @@ export function Team() {
         return;
       }
 
-      // Ambil ID dari response data (Menyesuaikan field dari database Supabase-mu)
       const groupId = resultCheck.data.id || resultCheck.data.group_id;
 
-      // Langkah B: Jika ketemu, langsung join ke grup tersebut
       const resJoin = await fetch("http://localhost:3000/api/groupJoin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           group_id: groupId,
-          user_id: user.UserID, // REVISI: Menggunakan UserID dari UserModel
-          user_role: "member" // Set baku role sebagai member biasa saat join lewat kode
+          user_id: user.UserID,
+          user_role: "M"
         })
       });
 
@@ -150,10 +141,8 @@ export function Team() {
     }
   };
 
-  // Tampilkan data dinamis untuk nama user yang menyapa di atas
   const currentUser = getLoggedInUser();
-  const displayName = currentUser ? currentUser.UserFullName : "Guest"; // REVISI: Menggunakan UserFullName
-
+  const displayName = currentUser ? currentUser.UserFullName : "Guest"; 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-4">
       <div className="mb-8 flex flex-col items-center text-center">

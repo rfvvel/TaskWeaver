@@ -1,258 +1,251 @@
-import { useState } from "react";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles, Clock } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useOutletContext } from "react-router-dom";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
+import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 
-const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const currentWeek = [
-  { date: 10, day: "Mon", tasks: [] },
-  { date: 11, day: "Tue", tasks: [] },
-  { date: 12, day: "Wed", tasks: [] },
-  { 
-    date: 13, 
-    day: "Thu", 
-    tasks: [
-      { id: 1, title: "Design Review", time: "10:00 AM", member: "Sarah Chen", color: "bg-blue-500" },
-      { id: 2, title: "Team Standup", time: "2:00 PM", member: "All", color: "bg-purple-500" },
-    ]
-  },
-  { 
-    date: 14, 
-    day: "Fri", 
-    isToday: true,
-    tasks: [
-      { id: 3, title: "API Testing", time: "11:00 AM", member: "Alex Johnson", color: "bg-green-500" },
-      { id: 4, title: "Sprint Planning", time: "3:00 PM", member: "All", color: "bg-indigo-500" },
-    ]
-  },
-  { 
-    date: 15, 
-    day: "Sat", 
-    tasks: [] 
-  },
-  { 
-    date: 16, 
-    day: "Sun", 
-    tasks: [
-      { id: 5, title: "Auth Flow Due", time: "11:59 PM", member: "Sarah Chen", color: "bg-red-500", isDeadline: true },
-    ]
-  },
-];
-
-const upcomingEvents = [
-  { 
-    id: 1, 
-    title: "Design authentication flow UI", 
-    date: "Feb 16, 2026",
-    time: "11:59 PM",
-    type: "deadline",
-    priority: "high",
-    assignee: "Sarah Chen"
-  },
-  { 
-    id: 2, 
-    title: "API Integration Testing", 
-    date: "Feb 16, 2026",
-    time: "2:00 PM",
-    type: "deadline",
-    priority: "high",
-    assignee: "Alex Johnson"
-  },
-  { 
-    id: 3, 
-    title: "UI Mockups Finalization", 
-    date: "Feb 18, 2026",
-    time: "5:00 PM",
-    type: "deadline",
-    priority: "medium",
-    assignee: "Sarah Chen"
-  },
-  { 
-    id: 4, 
-    title: "Team Retrospective", 
-    date: "Feb 19, 2026",
-    time: "3:00 PM",
-    type: "meeting",
-    priority: "medium",
-    assignee: "All"
-  },
-];
+// Interface menyesuaikan dengan struktur Task di Dashboard
+interface SubTask { id: string; title: string; assignedTo: string; avatarSeed: string; status: string; }
+interface Task { id: string; team: string; title: string; difficulty: string; dueDate: string; assignedTo: string | null; status: string; subtasks: SubTask[]; }
 
 export function Calendar() {
-  const [currentMonth, setCurrentMonth] = useState("February 2026");
+  const { activeTeam } = useOutletContext<{ activeTeam: string }>();
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  
+  // State untuk navigasi tanggal
+  const [baseDate, setBaseDate] = useState(new Date());
+  // State untuk toggle Month/Week view (baru tampilan dasar)
+  const [view, setView] = useState<"week" | "month">("week");
+
+  // Ambil data task dari LocalStorage
+  useEffect(() => {
+    const fetchTasks = () => {
+      const stored = localStorage.getItem("tw_tasks");
+      if (stored) setAllTasks(JSON.parse(stored));
+    };
+    fetchTasks();
+    
+    window.addEventListener("storage", fetchTasks);
+    return () => window.removeEventListener("storage", fetchTasks);
+  }, []);
+
+  // Filter task khusus untuk tim yang sedang aktif
+  const teamTasks = allTasks.filter(t => t.team === activeTeam);
+
+  // FUNGSI NAVIGASI TANGGAL
+  const handlePrevWeek = () => {
+    const newDate = new Date(baseDate);
+    newDate.setDate(newDate.getDate() - 7);
+    setBaseDate(newDate);
+  };
+
+  const handleNextWeek = () => {
+    const newDate = new Date(baseDate);
+    newDate.setDate(newDate.getDate() + 7);
+    setBaseDate(newDate);
+  };
+
+  const goToToday = () => setBaseDate(new Date());
+
+  // Helper untuk membuat daftar hari dalam 1 minggu berdasarkan baseDate
+  const getWeekDays = (date: Date) => {
+    const current = new Date(date);
+    const day = current.getDay();
+    const diff = current.getDate() - day + (day === 0 ? -6 : 1); // Geser ke hari Senin
+    const monday = new Date(current.setDate(diff));
+    
+    const week = [];
+    const todayStr = new Date().toDateString();
+
+    for (let i = 0; i < 7; i++) {
+     const nextDate = new Date(monday);
+      nextDate.setDate(monday.getDate() + i);
+      
+      // Format YYYY-MM-DD yang kebal dari bug zona waktu (waktu lokal)
+      const yyyy = nextDate.getFullYear();
+      const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(nextDate.getDate()).padStart(2, '0');
+      const dateStr = `${yyyy}-${mm}-${dd}`;
+      
+      // Cari task yang due date-nya jatuh pada hari ini
+     const dayTasks = teamTasks.filter(t => t.dueDate.startsWith(dateStr));
+
+      week.push({
+        date: nextDate.getDate(),
+        day: nextDate.toLocaleDateString("en-US", { weekday: "short" }),
+        fullDate: dateStr,
+        isToday: nextDate.toDateString() === todayStr,
+        tasks: dayTasks.map(t => ({
+          id: t.id,
+          title: t.title,
+          time: "11:59 PM", // Default deadline time
+          member: t.assignedTo || "Unassigned",
+          color: t.status === "completed" ? "bg-green-500" : "bg-indigo-500"
+        }))
+      });
+    }
+    return week;
+  };
+
+  const currentWeekDays = getWeekDays(baseDate);
+  
+  // Format judul bulan (e.g., "February 2026")
+  const currentMonthLabel = baseDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  
+  // Header teks untuk rentang minggu
+  const weekStart = currentWeekDays[0].date;
+  const weekEnd = currentWeekDays[6].date;
+  const weekMonth = baseDate.toLocaleDateString("en-US", { month: "short" });
+
+  // MENGHITUNG UPCOMING EVENTS (Task yang belum selesai & deadline >= hari ini)
+  const todayISO = new Date().toISOString().split('T')[0];
+  const upcomingTasks = teamTasks
+    .filter(t => t.status !== "completed" && t.dueDate >= todayISO)
+    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    .slice(0, 5); // Ambil 5 terdekat
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-foreground mb-1">Calendar</h1>
-          <p className="text-muted-foreground">Manage deadlines and team schedules</p>
+          <p className="text-muted-foreground">Manage deadlines for <span className="font-semibold text-indigo-600">{activeTeam}</span></p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="rounded-xl">
+          <Button variant="outline" onClick={goToToday} className="rounded-xl mr-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
+            Today
+          </Button>
+          <Button variant="outline" size="icon" className="rounded-xl" onClick={handlePrevWeek}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <div className="px-4 py-2 bg-card border border-border rounded-xl">
-            <p className="font-medium">{currentMonth}</p>
+          <div className="px-4 py-2 bg-white border border-border rounded-xl min-w-[160px] text-center shadow-sm">
+            <p className="font-medium text-slate-800">{currentMonthLabel}</p>
           </div>
-          <Button variant="outline" size="icon" className="rounded-xl">
+          <Button variant="outline" size="icon" className="rounded-xl" onClick={handleNextWeek}>
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
       </div>
 
-      {/* AI Suggestion */}
-      <Card className="border-indigo-200 bg-gradient-to-r from-indigo-50 to-cyan-50 shadow-sm">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-cyan-500 flex items-center justify-center shadow-md flex-shrink-0">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <div className="flex-1">
-              <p className="font-medium text-indigo-900">AI Deadline Suggestion</p>
-              <p className="text-sm text-indigo-700">
-                Based on current progress, consider extending "UI Mockups Finalization" deadline by 2 days to Feb 20
-              </p>
-            </div>
-            <Button className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl">
-              Apply
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Weekly Calendar View */}
-        <Card className="lg:col-span-2 border-border shadow-sm">
+        <Card className="lg:col-span-2 border-border shadow-sm bg-white">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle>This Week</CardTitle>
-                <CardDescription>Feb 10 - Feb 16, 2026</CardDescription>
+                <CardDescription>{weekMonth} {weekStart} - {weekEnd}, {baseDate.getFullYear()}</CardDescription>
               </div>
-              <Button variant="outline" className="gap-2 rounded-xl">
+              <Button 
+                variant="outline" 
+                className="gap-2 rounded-xl"
+                onClick={() => setView(view === "week" ? "month" : "week")}
+              >
                 <CalendarIcon className="w-4 h-4" />
-                Month View
+                {view === "week" ? "Month View" : "Week View"}
               </Button>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-7 gap-2">
-              {currentWeek.map((day, idx) => (
-                <div 
-                  key={idx} 
-                  className={`p-3 rounded-xl border ${
-                    day.isToday 
-                      ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-cyan-50' 
-                      : 'border-border bg-card'
-                  } hover:shadow-md transition-all min-h-[140px] flex flex-col`}
-                >
-                  <div className="text-center mb-2">
-                    <p className="text-xs text-muted-foreground mb-1">{day.day}</p>
-                    <div className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center ${
+            {view === "week" ? (
+              <div className="grid grid-cols-7 gap-2">
+                {currentWeekDays.map((day, idx) => (
+                  <div 
+                    key={idx} 
+                    className={`p-3 rounded-xl border ${
                       day.isToday 
-                        ? 'bg-gradient-to-br from-indigo-600 to-cyan-500 text-white font-semibold' 
-                        : 'text-foreground'
-                    }`}>
-                      {day.date}
+                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-cyan-50 ring-1 ring-indigo-200' 
+                        : 'border-slate-200 bg-slate-50'
+                    } hover:shadow-md transition-all min-h-[140px] flex flex-col`}
+                  >
+                    <div className="text-center mb-3">
+                      <p className="text-xs text-slate-500 font-medium mb-1">{day.day}</p>
+                      <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
+                        day.isToday 
+                          ? 'bg-indigo-600 text-white font-bold shadow-sm' 
+                          : 'text-slate-700 font-semibold'
+                      }`}>
+                        {day.date}
+                      </div>
+                    </div>
+                    <div className="space-y-1.5 flex-1 overflow-y-auto max-h-[120px] custom-scrollbar">
+                      {day.tasks.map((task, i) => (
+                        <div 
+                          key={`${task.id}-${i}`} 
+                          className={`${task.color} text-white px-2 py-1.5 rounded-md cursor-pointer hover:opacity-90 transition-opacity shadow-sm`}
+                          title={`${task.title} - Assigned to ${task.member}`}
+                        >
+                          <p className="text-[11px] font-medium truncate leading-tight">{task.title}</p>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                  <div className="space-y-1 flex-1">
-                    {day.tasks.map((task) => (
-                      <div 
-                        key={task.id} 
-                        className={`${task.color} text-white text-xs p-2 rounded-lg cursor-pointer hover:opacity-90 transition-opacity`}
-                      >
-                        <p className="font-medium truncate">{task.title}</p>
-                        <p className="text-[10px] opacity-90">{task.time}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-10 text-center border-2 border-dashed border-slate-200 rounded-xl">
+                <CalendarIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                {/* <p className="text-slate-500 font-medium">Month View is under construction</p>
+                <p className="text-sm text-slate-400">Silakan request desain grid 30 hari jika diperlukan!</p> */}
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Upcoming Events */}
-        <Card className="border-border shadow-sm">
+        <Card className="border-border shadow-sm bg-white">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
               <Clock className="w-5 h-5 text-indigo-600" />
-              Upcoming Events
+              Upcoming Deadlines
             </CardTitle>
-            <CardDescription>Next 7 days</CardDescription>
+            <CardDescription>Pending tasks closest to deadline</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {upcomingEvents.map((event) => (
-              <div key={event.id} className="p-3 rounded-xl border border-border hover:bg-accent transition-colors">
+            {upcomingTasks.length > 0 ? upcomingTasks.map((event) => (
+              <div key={event.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50 hover:border-indigo-100 transition-colors">
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <h4 className="font-medium text-sm text-foreground flex-1">{event.title}</h4>
+                    <h4 className="font-medium text-sm text-slate-800 flex-1 leading-snug">{event.title}</h4>
                     <Badge 
-                      variant={event.type === "deadline" ? "destructive" : "secondary"}
-                      className="text-xs"
+                      variant="outline"
+                      className={`text-[10px] ${
+                        event.difficulty === "expert" || event.difficulty === "hard" ? "bg-red-50 text-red-600 border-red-200" :
+                        event.difficulty === "medium" ? "bg-amber-50 text-amber-600 border-amber-200" :
+                        "bg-green-50 text-green-600 border-green-200"
+                      }`}
                     >
-                      {event.type}
+                      {event.difficulty}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <CalendarIcon className="w-3 h-3" />
-                    <span>{event.date}</span>
-                    <span>•</span>
-                    <span>{event.time}</span>
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <CalendarIcon className="w-3 h-3 text-indigo-400" />
+                    <span>{new Date(event.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Avatar className="w-5 h-5">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${event.assignee.toLowerCase().replace(' ', '')}`} />
-                      <AvatarFallback className="text-[10px]">{event.assignee.charAt(0)}</AvatarFallback>
+                  <div className="flex items-center gap-2 pt-1">
+                    <Avatar className="w-5 h-5 border border-white shadow-sm">
+                      <AvatarFallback className="text-[9px] bg-indigo-100 text-indigo-700 font-bold">
+                        {(event.assignedTo || "Unassigned").charAt(0)}
+                      </AvatarFallback>
                     </Avatar>
-                    <span className="text-xs text-muted-foreground">{event.assignee}</span>
+                    <span className="text-[11px] font-medium text-slate-600">{event.assignedTo || "Unassigned"}</span>
                   </div>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="text-center py-8">
+                <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-2">
+                  <Clock className="w-6 h-6 text-green-500" />
+                </div>
+                <p className="text-sm font-medium text-slate-700">Clear Schedule!</p>
+                <p className="text-xs text-slate-500 mt-1">No upcoming deadlines for {activeTeam}.</p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Monthly Overview */}
-      <Card className="border-border shadow-sm">
-        <CardHeader>
-          <CardTitle>Task Distribution by Week</CardTitle>
-          <CardDescription>Workload visualization for February 2026</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {[
-              { week: "Week 1 (Feb 1-7)", tasks: 8, progress: 100 },
-              { week: "Week 2 (Feb 8-14)", tasks: 12, progress: 75 },
-              { week: "Week 3 (Feb 15-21)", tasks: 10, progress: 30 },
-              { week: "Week 4 (Feb 22-28)", tasks: 6, progress: 0 },
-            ].map((week, idx) => (
-              <div key={idx} className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">{week.week}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-foreground font-medium">{week.tasks} tasks</span>
-                    <Badge variant="secondary" className="text-xs">
-                      {week.progress}% complete
-                    </Badge>
-                  </div>
-                </div>
-                <div className="w-full bg-muted rounded-full h-2">
-                  <div 
-                    className="h-full bg-gradient-to-r from-indigo-600 to-cyan-500 rounded-full transition-all"
-                    style={{ width: `${week.progress}%` }}
-                  ></div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

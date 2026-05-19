@@ -7,8 +7,8 @@ import { Progress } from "../../components/ui/progress";
 const activities = [
   {
     id: 1,
-    user: "Sarah Chen",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
+    user: "Steven Nathaniel",
+    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
     action: "completed task",
     target: "Design authentication flow mockups",
     time: "2 hours ago",
@@ -18,7 +18,7 @@ const activities = [
   {
     id: 2,
     user: "Alex Johnson",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alex",
+    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alex",
     action: "uploaded file",
     target: "test-results-final.pdf",
     time: "3 hours ago",
@@ -27,7 +27,7 @@ const activities = [
   {
     id: 3,
     user: "Michael Rodriguez",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=michael",
+    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=michael",
     action: "commented on",
     target: "API Integration Testing",
     time: "5 hours ago",
@@ -37,7 +37,7 @@ const activities = [
   {
     id: 4,
     user: "Emily Watson",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emily",
+    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emily",
     action: "started working on",
     target: "User profile components",
     time: "6 hours ago",
@@ -47,7 +47,7 @@ const activities = [
   {
     id: 5,
     user: "David Kim",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
+    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
     action: "updated",
     target: "Project proposal document",
     time: "1 day ago",
@@ -56,8 +56,8 @@ const activities = [
   },
   {
     id: 6,
-    user: "Sarah Chen",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
+    user: "Steven Nathaniel",
+    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
     action: "completed task",
     target: "Create wireframes for dashboard",
     time: "1 day ago",
@@ -67,7 +67,7 @@ const activities = [
   {
     id: 7,
     user: "Alex Johnson",
-    avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alex",
+    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alex",
     action: "completed task",
     target: "Set up testing environment",
     time: "2 days ago",
