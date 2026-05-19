@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   Bell, Lock, User, Palette, Zap, Plus, X, Check,
-  Code2, BookOpen, Star, Globe, Brain, Briefcase,
+  Code2, BookOpen, Star, Globe, Brain, Briefcase, LogOut
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -98,16 +99,7 @@ const TASK_PREF_OPTIONS = [
   { key: "preferOperations",     label: "Operations & Logistics",       desc: "Task management, scheduling, resource coordination" },
 ];
 
-const defaultSkills: Skill[] = [
-  // { id: "s1", name: "React",         category: "Frontend",      level: "Advanced" },
-  // { id: "s2", name: "TypeScript",    category: "Frontend",      level: "Intermediate" },
-  // { id: "s3", name: "Node.js",       category: "Backend",       level: "Intermediate" },
-  // { id: "s4", name: "PostgreSQL",    category: "Database",      level: "Beginner" },
-  // { id: "s5", name: "Figma",         category: "UI/UX Design",  level: "Intermediate" },
-  // { id: "s6", name: "Communication", category: "Soft Skill",    level: "Advanced" },
-  // { id: "s7", name: "Git & GitHub",  category: "DevOps / Cloud",level: "Intermediate" },
-  // { id: "s8", name: "Jest / Vitest", category: "Testing / QA",  level: "Beginner" },
-];
+const defaultSkills: Skill[] = [];
 
 const defaultWorkPrefs: WorkPrefs = {
   availableHoursPerWeek: 20,
@@ -185,15 +177,25 @@ function CategoryCombobox({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export function Settings() {
+  const navigate = useNavigate();
+
   // --- Profile ---
-  const [firstName, setFirstName] = useState("John");
-  const [lastName,  setLastName]  = useState("Doe");
-  const [email,     setEmail]     = useState("john.doe@university.edu");
+  const [firstName, setFirstName] = useState("Rafael");
+  const [lastName,  setLastName]  = useState("Vvel");
+  const [email,     setEmail]     = useState("rafaelvvel@binus.ac.id");
   const [phone,     setPhone]     = useState("");
-  // const [bio,       setBio]       = useState("CS student passionate about AI and team collaboration");
 
   const avatarInitials =
     `${firstName.trim().charAt(0)}${lastName.trim().charAt(0)}`.toUpperCase() || "?";
+
+  // --- Logout Handler ---
+  const handleLogout = () => {
+    // Menghapus data sesi user jika ada
+    localStorage.removeItem("user");
+    localStorage.removeItem("tw_activeTeam");
+    // Lempar kembali ke halaman login
+    navigate("/login");
+  };
 
   // --- Dark Mode ---
   const [isDark, setIsDark] = useState<boolean>(() => {
@@ -304,7 +306,6 @@ export function Settings() {
       <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="bg-muted rounded-xl">
           <TabsTrigger value="profile"       className="rounded-lg gap-2"><User    className="w-4 h-4" />Profile</TabsTrigger>
-          {/* <TabsTrigger value="notifications" className="rounded-lg gap-2"><Bell    className="w-4 h-4" />Notifications</TabsTrigger> */}
           <TabsTrigger value="skills"        className="rounded-lg gap-2"><Zap     className="w-4 h-4" />Skills</TabsTrigger>
           <TabsTrigger value="appearance"    className="rounded-lg gap-2"><Palette className="w-4 h-4" />Appearance</TabsTrigger>
           <TabsTrigger value="security"      className="rounded-lg gap-2"><Lock    className="w-4 h-4" />Security</TabsTrigger>
@@ -346,112 +347,26 @@ export function Settings() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
-                <Input id="phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+1 (555) 000-0000" className="rounded-xl" />
+                <Input id="phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+62 81234567" className="rounded-xl" />
               </div>
-              {/* <div className="space-y-2">
-                <Label htmlFor="bio">Bio</Label>
-                <Input id="bio" value={bio} onChange={e => setBio(e.target.value)} className="rounded-xl" />
-              </div> */}
-              <div className="flex gap-3">
-                <Button className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl">
-                  Save Changes
-                </Button>
-                <Button variant="outline" className="rounded-xl">Cancel</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* ══════════════════════ NOTIFICATIONS ══════════════════════ */}
-        <TabsContent value="notifications" className="space-y-6">
-          <Card className="border-border shadow-sm">
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>Manage how you receive notifications</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {[
-                { label: "Task Assignments",        desc: "Get notified when you're assigned a new task",              defaultOn: true },
-                { label: "AI Distribution Updates", desc: "Notifications about task distribution by AI",               defaultOn: true },
-                { label: "Deadline Reminders",      desc: "Receive reminders before task deadlines",                   defaultOn: true },
-                { label: "Chat Messages",            desc: "Get notified about new chat messages",                      defaultOn: true },
-                { label: "Team Activity",            desc: "Updates about team member activities",                      defaultOn: false },
-                { label: "File Updates",             desc: "Notifications when files are uploaded or modified",         defaultOn: true },
-              ].map((item, idx, arr) => (
-                <div key={item.label}>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{item.label}</Label>
-                      <p className="text-sm text-muted-foreground">{item.desc}</p>
-                    </div>
-                    <Switch defaultChecked={item.defaultOn} />
-                  </div>
-                  {idx < arr.length - 1 && <Separator className="mt-6" />}
+              
+              <div className="flex justify-between items-center w-full mt-4">
+                <div className="flex gap-3">
+                  <Button className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl">
+                    Save Changes
+                  </Button>
+                  <Button variant="outline" className="rounded-xl">Cancel</Button>
                 </div>
-              ))}
+                <Button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 text-white rounded-xl flex items-center gap-2">
+                  <LogOut className="w-4 h-4" /> Logout
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
 
         {/* ══════════════════════ SKILLS ══════════════════════ */}
         <TabsContent value="skills" className="space-y-6">
-
-          {/* Info banner */}
-          {/* <Card className="border-indigo-200 bg-gradient-to-r from-indigo-50 to-cyan-50 shadow-sm">
-            <CardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-cyan-500 flex items-center justify-center flex-shrink-0 shadow-md">
-                  <Brain className="w-5 h-5 text-white" />
-                </div>
-                <div>
-                  <p className="font-semibold text-indigo-900">How AI Uses Your Skills</p>
-                  <p className="text-sm text-indigo-700 mt-1 leading-relaxed">
-                    TaskWeaver AI analyzes your skill profile to assign the most relevant work.
-                    You're free to add <strong>any skill</strong> — not just technical ones — including design, languages, sports, arts, and more.
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card> */}
-
-          {/* Role & Availability */}
-          {/* <Card className="border-border shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Briefcase className="w-5 h-5 text-indigo-600" />
-                Role & Availability
-              </CardTitle>
-              <CardDescription>Let the AI know your role and weekly capacity</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Your Role in the Team</Label>
-                <Input
-                  value={preferredRole}
-                  onChange={e => {
-                    setPreferredRole(e.target.value);
-                    localStorage.setItem("tw_preferred_role", e.target.value);
-                  }}
-                  placeholder="e.g. Full Stack Developer, UI Designer, Product Manager, Content Writer…"
-                  className="rounded-xl"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Available Hours per Week</Label>
-                <div className="flex items-center gap-3">
-                  <Input
-                    type="number"
-                    min={1} max={168}
-                    value={workPrefs.availableHoursPerWeek}
-                    onChange={e => updateWorkPref("availableHoursPerWeek", Number(e.target.value))}
-                    className="rounded-xl w-28"
-                  />
-                  <span className="text-sm text-muted-foreground">hours / week</span>
-                </div>
-                <p className="text-xs text-muted-foreground">AI avoids overloading you beyond this threshold</p>
-              </div>
-            </CardContent>
-          </Card> */}
 
           {/* Skills list */}
           <Card className="border-border shadow-sm">
@@ -577,96 +492,8 @@ export function Settings() {
                   ))}
                 </div>
               )}
-
-              {/* Proficiency legend */}
-              {/* <div className="pt-2 border-t border-border">
-                <p className="text-xs text-muted-foreground mb-2 font-medium">Proficiency legend</p>
-                <div className="flex flex-wrap gap-2">
-                  {PROFICIENCY_LEVELS.map(l => (
-                    <span key={l} className={`text-xs px-2 py-0.5 rounded-full ${PROFICIENCY_COLORS[l]}`}>{l}</span>
-                  ))}
-                </div>
-              </div> */}
             </CardContent>
           </Card>
-
-          {/* Task Preferences */}
-          {/* <Card className="border-border shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Star className="w-5 h-5 text-indigo-600" />
-                Task Type Preferences
-              </CardTitle>
-              <CardDescription>
-                Tell AI what types of tasks you prefer — it will prioritize these when distributing work
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {TASK_PREF_OPTIONS.map((pref, idx, arr) => (
-                <div key={pref.key}>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{pref.label}</Label>
-                      <p className="text-sm text-muted-foreground">{pref.desc}</p>
-                    </div>
-                    <Switch
-                      checked={!!workPrefs[pref.key]}
-                      onCheckedChange={val => updateWorkPref(pref.key, val)}
-                    />
-                  </div>
-                  {idx < arr.length - 1 && <Separator className="mt-5" />}
-                </div>
-              ))}
-            </CardContent>
-          </Card> */}
-
-          {/* Learning Goals */}
-          {/* <Card className="border-border shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-indigo-600" />
-                Learning Goals
-              </CardTitle>
-              <CardDescription>
-                Skills you want to develop — AI may assign stretch tasks to help support your growth
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex gap-2">
-                <Input
-                  value={newGoal}
-                  onChange={e => setNewGoal(e.target.value)}
-                  onKeyDown={e => e.key === "Enter" && addGoal()}
-                  placeholder="e.g. Learn Docker, Improve public speaking, Learn Piano…"
-                  className="rounded-xl flex-1"
-                />
-                <Button
-                  onClick={addGoal}
-                  disabled={!newGoal.trim()}
-                  className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl"
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {learningGoals.length === 0
-                  ? <p className="text-sm text-muted-foreground">No learning goals set yet.</p>
-                  : learningGoals.map((goal, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center gap-2 pl-3 pr-2 py-1 rounded-full bg-amber-50 border border-amber-200 text-amber-700 text-sm"
-                    >
-                      <BookOpen className="w-3 h-3 flex-shrink-0" />
-                      <span>{goal}</span>
-                      <button onClick={() => removeGoal(idx)} className="opacity-50 hover:opacity-100 transition-opacity">
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  ))
-                }
-              </div>
-            </CardContent>
-          </Card> */}
 
           {/* Skill Visibility */}
           <Card className="border-border shadow-sm">
@@ -679,9 +506,8 @@ export function Settings() {
             </CardHeader>
             <CardContent className="space-y-5">
               {[
-                { label: "Show skills to team members", desc: "Team members can view your full skill profile",                                    defaultOn: true },
+                { label: "Show skills to team members", desc: "Team members can view your full skill profile",                                      defaultOn: true },
                 { label: "Show proficiency levels",      desc: "Display proficiency levels alongside skill names",                                 defaultOn: true },
-                // { label: "Share learning goals",         desc: "Let team leads see your growth areas to better plan stretch tasks",                defaultOn: false },
               ].map((item, idx, arr) => (
                 <div key={item.label}>
                   <div className="flex items-center justify-between">
@@ -744,30 +570,6 @@ export function Settings() {
                   </button>
                 </div>
               </div>
-              {/* <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Dark Mode</Label>
-                  <p className="text-sm text-muted-foreground">Toggle between light and dark</p>
-                </div>
-                <Switch checked={isDark} onCheckedChange={setIsDark} />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Compact Mode</Label>
-                  <p className="text-sm text-muted-foreground">Reduce spacing for more content on screen</p>
-                </div>
-                <Switch />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>Animations</Label>
-                  <p className="text-sm text-muted-foreground">Enable smooth transitions and animations</p>
-                </div>
-                <Switch defaultChecked />
-              </div> */}
             </CardContent>
           </Card>
         </TabsContent>
@@ -795,22 +597,6 @@ export function Settings() {
               <Button className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl">
                 Update Password
               </Button>
-              {/* <Separator />
-              {[
-                { label: "Two-Factor Authentication", desc: "Add an extra layer of security to your account", defaultOn: false },
-                { label: "Session Timeout",           desc: "Automatically log out after inactivity",          defaultOn: true },
-              ].map((item, idx, arr) => (
-                <div key={item.label}>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{item.label}</Label>
-                      <p className="text-sm text-muted-foreground">{item.desc}</p>
-                    </div>
-                    <Switch defaultChecked={item.defaultOn} />
-                  </div>
-                  {idx < arr.length - 1 && <Separator className="mt-6" />}
-                </div>
-              ))} */}
             </CardContent>
           </Card>
         </TabsContent>

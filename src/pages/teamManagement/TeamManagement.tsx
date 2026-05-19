@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { Users, LogOut, Search, Mail, Shield, CheckCircle2, Circle, Clock, Plus, LogIn, Copy, Check, AlignLeft, ClipboardList } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "../../components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "../../components/ui/alert-dialog";
 
-// Interface
 interface BigTask { id: string; title: string; status: "todo" | "in-progress" | "completed"; deadline: string; }
 interface TeamMember { id: string; name: string; email: string; role: "admin" | "member"; avatarSeed: string; joinDate: string; }
 interface Team { id: string; name: string; description: string; inviteCode: string; members: TeamMember[]; bigTasks: BigTask[]; }
@@ -19,7 +18,6 @@ interface Team { id: string; name: string; description: string; inviteCode: stri
 export function TeamManagement() {
   const navigate = useNavigate();
   
-  // MENGAMBIL DATA GLOBAL DARI LAYOUT. (Tidak ada useState lokal untuk teams!)
   const { teams, setTeams, activeTeam, setActiveTeam } = useOutletContext<{ 
     teams: Team[], setTeams: (t: Team[]) => void, 
     activeTeam: string, setActiveTeam: (t: string) => void 
@@ -37,6 +35,85 @@ export function TeamManagement() {
   const [newTeamDesc, setNewTeamDesc] = useState("");
   const [teamNameError, setTeamNameError] = useState("");
 
+  const getLoggedInUser = () => {
+    const userStr = localStorage.getItem("user");
+    return userStr ? JSON.parse(userStr) : null;
+  };
+
+  useEffect(() => {
+    const fetchUserTeams = async () => {
+      const user = getLoggedInUser();
+      if (!user) return;
+      const userId = user.UserID || user.id || user.user_id;
+
+      try {
+        const response = await fetch("http://localhost:3000/api/groupGetGroupByUserId", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId })
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.status === "sukses") {
+          
+          // 2. Looping setiap tim untuk mengambil data MEMBER-nya sekaligus
+          const teamsWithMembers = await Promise.all(result.data.map(async (g: any) => {
+            let membersList: TeamMember[] = [];
+            
+            try {
+              // Tembak API GetMember untuk grup ini
+              const memRes = await fetch("http://localhost:3000/api/groupGetMember", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ group_id: g.group_id })
+              });
+              
+              const memData = await memRes.json();
+              
+              if (memRes.ok && memData.status === "sukses") {
+                // Terjemahkan data member dari DB ke format React
+                membersList = memData.data.map((m: any) => ({
+                  id: String(m.user_id || m.id || Math.random()),
+                  name: m.user_fullname || m.UserFullName || m.name || `User ${m.user_id}`,
+                  email: m.user_email || m.UserEmail || m.email || "No Email",
+                  // Berdasarkan screenshot SQL-mu, role Admin biasanya huruf 'A'
+                  role: (m.user_role === 'A' || m.role === 'admin') ? "admin" : "member",
+                  avatarSeed: m.user_fullname || m.UserFullName || "user",
+                  joinDate: "Joined recently"
+                }));
+              }
+            } catch (e) {
+              console.error(`Gagal mengambil member untuk grup ${g.group_id}`, e);
+            }
+
+            // Kembalikan objek tim utuh yang sudah ada anggota & invite code-nya
+            return {
+              id: String(g.group_id),
+              name: g.group_name,
+              description: g.group_description || "No description provided.",
+              inviteCode: g.group_invite_code || "---", // Menarik dari model yang baru di-update
+              members: membersList,
+              bigTasks: []
+            };
+          }));
+
+          // 3. Pasang semua data yang sudah lengkap ke State Layar
+          setTeams(teamsWithMembers);
+
+          if (teamsWithMembers.length > 0 && !activeTeam) {
+            setActiveTeam(teamsWithMembers[0].name);
+            localStorage.setItem("tw_activeTeam", teamsWithMembers[0].name);
+          }
+        }
+      } catch (error) {
+        console.error("❌ Gagal menarik data:", error);
+      }
+    };
+
+    fetchUserTeams();
+  }, []);
+
   const openTeamTasks = (team: Team) => { setSelectedTeam(team); setTaskDialogOpen(true); };
 
   const goToTaskManagement = () => { setTaskDialogOpen(false); navigate("/task-management"); };
@@ -51,13 +128,11 @@ export function TeamManagement() {
     navigator.clipboard.writeText(code); setCopiedCode(code); setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  // LOGIKA KELUAR TIM + SINKRONISASI DROPDOWN
   const handleLeaveTeam = (teamId: string) => {
     const teamToLeave = teams.find(t => t.id === teamId);
     const updatedTeams = teams.filter(team => team.id !== teamId);
-    setTeams(updatedTeams); // Update global state
+    setTeams(updatedTeams);
     
-    // Jika tim yang dihapus kebetulan sedang aktif di Dropdown, ganti activeTeam ke tim lain
     if (teamToLeave?.name === activeTeam) {
       setActiveTeam(updatedTeams.length > 0 ? updatedTeams[0].name : "No Team");
     }
@@ -77,15 +152,14 @@ export function TeamManagement() {
       members: [ { id: `m-${Date.now()}`, name: "Rafael Vvel", email: "rafael.vvel@gmail.com", role: "admin", avatarSeed: "rafael", joinDate: `Joined ${new Date().toLocaleDateString()}` } ]
     };
 
-    setTeams([...teams, newTeam]); // Menambah tim ke Global State
-    setActiveTeam(newTeam.name); // Otomatis ubah Dropdown ke tim baru
+    setTeams([...teams, newTeam]);
+    setActiveTeam(newTeam.name);
     setCreateDialogOpen(false); 
     setNewTeamName(""); setNewTeamDesc("");
   };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-slate-900">Team Management</h1>
@@ -136,7 +210,6 @@ export function TeamManagement() {
         </div>
       </div>
 
-      {/* POP-UP DAFTAR TUGAS BESAR */}
       <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
         <DialogContent className="rounded-2xl max-w-lg bg-white">
           {selectedTeam && (
@@ -168,8 +241,6 @@ export function TeamManagement() {
         </DialogContent>
       </Dialog>
 
-
-      {/* DAFTAR KARTU TIM */}
       <div className="space-y-8">
         {teams.map((team) => (
           <Card key={team.id} className="rounded-2xl shadow-sm border-slate-200 overflow-hidden bg-white animate-in slide-in-from-bottom-4 duration-300">
