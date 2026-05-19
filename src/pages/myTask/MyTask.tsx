@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { format } from "date-fns";
 
-// ─── Types (mirrored from TaskManagement — ideally shared via types/task.ts) ──
+// ─── Types ───────────────────────────────────────────────────────────────────
 interface SubTask {
   id: string;
   title: string;
@@ -38,32 +38,29 @@ interface Task {
   subtasks: SubTask[];
 }
 
-// ─── Flat "my task" shape built from subtasks ─────────────────────────────────
 interface MyTask {
-  id: string;          // subtask id
-  taskId: string;      // parent task id
-  title: string;       // subtask title
-  bigTaskTitle: string;// parent task title
+  id: string;
+  taskId: string;
+  title: string;
+  bigTaskTitle: string;
   team: string;
-  deadline: string;    // parent task dueDate (ISO)
+  deadline: string;
   priority: "high" | "medium" | "low";
   status: "todo" | "in-progress" | "completed";
-  category: string;    // derived from parent tags[0] or difficulty
+  category: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const TASKS_KEY = "tw_tasks";
-// The logged-in user's name — in production this comes from auth context
-const CURRENT_USER = "Lie Darren";
+const CURRENT_USER = "Rafael"; // Sesuaikan dengan nama user yang login nanti
 
-// ─── Priority derived from parent difficulty ──────────────────────────────────
+// ─── Utilities ────────────────────────────────────────────────────────────────
 function difficultyToPriority(d: string): MyTask["priority"] {
   if (d === "expert" || d === "hard") return "high";
   if (d === "medium") return "medium";
   return "low";
 }
 
-// ─── Load all tasks from localStorage ────────────────────────────────────────
 function loadAllTasks(): Task[] {
   try {
     const raw = localStorage.getItem(TASKS_KEY);
@@ -76,12 +73,11 @@ function saveAllTasks(tasks: Task[]) {
   localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
 }
 
-// ─── Build flat MyTask list for current user ──────────────────────────────────
 function buildMyTasks(allTasks: Task[]): MyTask[] {
   const result: MyTask[] = [];
   allTasks.forEach((task) => {
     task.subtasks
-      .filter((s) => s.assignedTo === CURRENT_USER)
+      // Saat ini difilter berdasarkan CURRENT_USER. Bisa di-adjust nanti
       .forEach((sub) => {
         result.push({
           id: sub.id,
@@ -107,7 +103,6 @@ export function MyTasks() {
   const [myTasks, setMyTasks] = useState<MyTask[]>([]);
   const [search, setSearch] = useState("");
 
-  // Rebuild myTasks whenever localStorage tasks change (e.g. after AI breakdown)
   useEffect(() => {
     const refresh = () => {
       const fresh = loadAllTasks();
@@ -115,13 +110,10 @@ export function MyTasks() {
       setMyTasks(buildMyTasks(fresh).filter((t) => t.team === activeTeam));
     };
     refresh();
-
-    // Listen for storage events from other tabs / pages
     window.addEventListener("storage", refresh);
     return () => window.removeEventListener("storage", refresh);
   }, [activeTeam]);
 
-  // Also refresh when this component is focused (user navigated back from TaskManagement)
   useEffect(() => {
     const onFocus = () => {
       const fresh = loadAllTasks();
@@ -132,7 +124,6 @@ export function MyTasks() {
     return () => window.removeEventListener("focus", onFocus);
   }, [activeTeam]);
 
-  // ── Mutate subtask status ─────────────────────────────────────────────────
   const updateSubtaskStatus = (taskId: string, subtaskId: string, newStatus: SubTask["status"]) => {
     const updated = allTasks.map((t) => {
       if (t.id !== taskId) return t;
@@ -146,26 +137,80 @@ export function MyTasks() {
     setMyTasks(buildMyTasks(updated).filter((mt) => mt.team === activeTeam));
   };
 
-  // ── Submit dialog ─────────────────────────────────────────────────────────
+  // ── Submit dialog States ──────────────────────────────────────────────────
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [submittingTask, setSubmittingTask] = useState<MyTask | null>(null);
   const [submissionLink, setSubmissionLink] = useState("");
   const [submissionFile, setSubmissionFile] = useState<string | null>(null);
+  const [submissionFileSize, setSubmissionFileSize] = useState<string>("0 KB");
+  // Default di-set ke Document agar rapi
+  const [submissionCategory, setSubmissionCategory] = useState("document"); 
   const [activeTab, setActiveTab] = useState("link");
 
   const openSubmitDialog = (task: MyTask) => {
     setSubmittingTask(task);
     setSubmissionLink("");
     setSubmissionFile(null);
+    setSubmissionCategory("document"); // Reset default
     setSubmitDialogOpen(true);
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) setSubmissionFile(e.target.files[0].name);
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setSubmissionFile(file.name);
+      // Kalkulasi size
+      if (file.size > 1024 * 1024) {
+        setSubmissionFileSize((file.size / (1024 * 1024)).toFixed(1) + " MB");
+      } else {
+        setSubmissionFileSize((file.size / 1024).toFixed(0) + " KB");
+      }
+    }
   };
 
   const confirmSubmit = () => {
     if (!submittingTask) return;
+
+    // --- INTEGRASI KE HALAMAN FILES ---
+    const storedFiles = localStorage.getItem("tw_files");
+    const currentFiles = storedFiles ? JSON.parse(storedFiles) : [];
+
+    let fileName = "";
+    let fileSize = "";
+    let fileType = "document";
+
+    if (activeTab === "link") {
+      fileName = `Link: ${submittingTask.title}`;
+      fileSize = "---";
+      fileType = "document";
+    } else {
+      fileName = submissionFile || "unknown-file";
+      fileSize = submissionFileSize;
+      // Cek tipe file dari extension untuk icon di Files
+      const ext = fileName.split('.').pop()?.toLowerCase();
+      if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext || '')) fileType = 'image';
+      else if (['fig', 'sketch'].includes(ext || '')) fileType = 'design';
+      else if (['js', 'jsx', 'ts', 'tsx', 'html', 'css', 'json'].includes(ext || '')) fileType = 'code';
+    }
+
+    const newFile = {
+      id: Date.now(),
+      name: fileName,
+      type: fileType, // type ini untuk nampilin warna icon di Files
+      size: fileSize,
+      owner: CURRENT_USER,
+      avatar: CURRENT_USER,
+      uploadDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      status: "final",
+      category: submissionCategory // Kategori dari dropdown (design, document, code, other)
+    };
+
+    currentFiles.unshift(newFile); 
+    localStorage.setItem("tw_files", JSON.stringify(currentFiles));
+    
+    window.dispatchEvent(new Event("storage"));
+    // -----------------------------------
+
     updateSubtaskStatus(submittingTask.taskId, submittingTask.id, "completed");
     setSubmitDialogOpen(false);
     setSubmittingTask(null);
@@ -199,7 +244,6 @@ export function MyTasks() {
   const completed = myTasks.filter((t) => t.status === "completed").length;
   const highPriority = myTasks.filter((t) => t.priority === "high" && t.status !== "completed").length;
 
-  // ── Task card ─────────────────────────────────────────────────────────────
   const TaskCard = ({ task, showActions = true }: { task: MyTask; showActions?: boolean }) => (
     <Card className={`border-border bg-white shadow-sm hover:shadow-md transition-shadow ${task.status === "completed" ? "opacity-60" : ""}`}>
       <CardContent className="p-4">
@@ -248,7 +292,6 @@ export function MyTasks() {
     </Card>
   );
 
-  // ── Empty state for no subtasks ────────────────────────────────────────────
   const NoTasksState = () => (
     <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-slate-200 rounded-2xl">
       <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
@@ -270,7 +313,6 @@ export function MyTasks() {
         </p>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="border-border shadow-sm">
           <CardContent className="p-4 text-center">
@@ -298,7 +340,6 @@ export function MyTasks() {
         </Card>
       </div>
 
-      {/* Search */}
       <div className="flex gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -311,7 +352,6 @@ export function MyTasks() {
         </div>
       </div>
 
-      {/* Tabs */}
       {total === 0 ? (
         <NoTasksState />
       ) : (
@@ -324,28 +364,16 @@ export function MyTasks() {
           </TabsList>
 
           <TabsContent value="all" className="space-y-3">
-            {filtered().length === 0
-              ? <p className="text-center text-slate-400 py-8">No tasks match your search.</p>
-              : filtered().map((t) => <TaskCard key={t.id} task={t} />)
-            }
+            {filtered().length === 0 ? <p className="text-center text-slate-400 py-8">No tasks match your search.</p> : filtered().map((t) => <TaskCard key={t.id} task={t} />)}
           </TabsContent>
           <TabsContent value="todo" className="space-y-3">
-            {filtered("todo").length === 0
-              ? <p className="text-center text-slate-400 py-8">No to-do tasks.</p>
-              : filtered("todo").map((t) => <TaskCard key={t.id} task={t} />)
-            }
+            {filtered("todo").length === 0 ? <p className="text-center text-slate-400 py-8">No to-do tasks.</p> : filtered("todo").map((t) => <TaskCard key={t.id} task={t} />)}
           </TabsContent>
           <TabsContent value="in-progress" className="space-y-3">
-            {filtered("in-progress").length === 0
-              ? <p className="text-center text-slate-400 py-8">No in-progress tasks.</p>
-              : filtered("in-progress").map((t) => <TaskCard key={t.id} task={t} />)
-            }
+            {filtered("in-progress").length === 0 ? <p className="text-center text-slate-400 py-8">No in-progress tasks.</p> : filtered("in-progress").map((t) => <TaskCard key={t.id} task={t} />)}
           </TabsContent>
           <TabsContent value="completed" className="space-y-3">
-            {filtered("completed").length === 0
-              ? <p className="text-center text-slate-400 py-8">No completed tasks yet.</p>
-              : filtered("completed").map((t) => <TaskCard key={t.id} task={t} showActions={false} />)
-            }
+            {filtered("completed").length === 0 ? <p className="text-center text-slate-400 py-8">No completed tasks yet.</p> : filtered("completed").map((t) => <TaskCard key={t.id} task={t} showActions={false} />)}
           </TabsContent>
         </Tabs>
       )}
@@ -388,7 +416,7 @@ export function MyTasks() {
                   <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
                     <UploadCloud className="w-8 h-8 text-slate-400 mb-2" />
                     <p className="text-sm text-slate-500"><span className="font-semibold text-blue-600">Click to upload</span> or drag and drop</p>
-                    <p className="text-xs text-slate-400 mt-1">PDF, DOCX, ZIP (Max 25MB)</p>
+                    <p className="text-xs text-slate-400 mt-1">PDF, DOCX, ZIP, PNG dll</p>
                     <input type="file" className="hidden" onChange={handleFileUpload} />
                   </label>
                 ) : (
@@ -399,7 +427,7 @@ export function MyTasks() {
                       </div>
                       <div>
                         <span className="text-sm font-medium text-slate-700 max-w-[200px] truncate block">{submissionFile}</span>
-                        <span className="text-xs text-green-600 font-medium">Ready to submit</span>
+                        <span className="text-xs text-green-600 font-medium">Ready to submit ({submissionFileSize})</span>
                       </div>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => setSubmissionFile(null)} className="text-slate-400 hover:text-red-500">
@@ -410,6 +438,21 @@ export function MyTasks() {
               </div>
             </TabsContent>
           </Tabs>
+
+          {/* DITAMBAHKAN: Dropdown Kategori (Sesuai Permintaan) */}
+          <div className="space-y-2 mt-2">
+            <Label className="text-sm font-semibold text-slate-700">Category</Label>
+            <select
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              value={submissionCategory}
+              onChange={(e) => setSubmissionCategory(e.target.value)}
+            >
+              <option value="design">Design</option>
+              <option value="document">Document</option>
+              <option value="code">Code</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
 
           <DialogFooter className="mt-4">
             <Button variant="outline" onClick={() => setSubmitDialogOpen(false)} className="rounded-xl">Cancel</Button>
