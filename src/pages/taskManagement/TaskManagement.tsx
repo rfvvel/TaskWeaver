@@ -25,33 +25,11 @@ import { Calendar } from "../../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { format } from "date-fns";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-export interface SubTask {
-  id: string;
-  title: string;
-  assignedTo: string;
-  avatarSeed: string;
-  status: "todo" | "in-progress" | "completed";
-}
+export interface SubTask { id: string; title: string; assignedTo: string; avatarSeed: string; status: "todo" | "in-progress" | "completed"; }
+export interface Task { id: string; team: string; title: string; description: string; attachment: string | null; difficulty: "easy" | "medium" | "hard" | "expert"; dueDate: string; assignedTo: string | null; tags: string[]; status: "todo" | "in-progress" | "review" | "completed"; subtasks: SubTask[]; }
 
-export interface Task {
-  id: string;
-  team: string;
-  title: string;
-  description: string;
-  attachment: string | null;
-  difficulty: "easy" | "medium" | "hard" | "expert";
-  dueDate: string; // stored as ISO string for localStorage serialisation
-  assignedTo: string | null;
-  tags: string[];
-  status: "todo" | "in-progress" | "review" | "completed";
-  subtasks: SubTask[];
-}
-
-// ─── localStorage key ─────────────────────────────────────────────────────────
 const TASKS_KEY = "tw_tasks";
 
-// ─── Initial seed tasks (shown only the first time) ──────────────────────────
 const SEED_TASKS: Task[] = [
   {
     id: "seed-1",
@@ -85,13 +63,11 @@ const SEED_TASKS: Task[] = [
   },
 ];
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function loadTasks(): Task[] {
   try {
     const raw = localStorage.getItem(TASKS_KEY);
     if (raw) return JSON.parse(raw) as Task[];
   } catch (_) {}
-  // First run — seed and persist
   localStorage.setItem(TASKS_KEY, JSON.stringify(SEED_TASKS));
   return SEED_TASKS;
 }
@@ -100,11 +76,8 @@ function saveTasks(tasks: Task[]) {
   localStorage.setItem(TASKS_KEY, JSON.stringify(tasks));
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
 export function TaskManagement() {
   const { activeTeam } = useOutletContext<{ activeTeam: string }>();
-
-  // Read from localStorage on mount, persist on every change
   const [tasks, setTasksState] = useState<Task[]>(loadTasks);
 
   const setTasks = (updated: Task[]) => {
@@ -112,7 +85,6 @@ export function TaskManagement() {
     saveTasks(updated);
   };
 
-  // If activeTeam changes we still want to stay on the page — filter in render
   const currentTeamTasks = tasks.filter((t) => t.team === activeTeam);
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -127,7 +99,6 @@ export function TaskManagement() {
   };
   const [formData, setFormData] = useState<Partial<Task>>(emptyForm);
 
-  // Keep selectedTask in sync when tasks change (e.g. after AI breakdown)
   useEffect(() => {
     if (selectedTask) {
       const fresh = tasks.find((t) => t.id === selectedTask.id);
@@ -198,14 +169,11 @@ export function TaskManagement() {
     return map[d] ?? "bg-gray-600";
   };
 
-  // ── AI Breakdown ────────────────────────────────────────────────────────────
   const handleRunAI = () => {
     if (!selectedTask) return;
     setIsGeneratingAI(true);
 
     setTimeout(() => {
-      // Assign subtasks to actual team members from the task title/description context
-      // In production this would call the Gemini API
       const now = Date.now();
       const aiSubtasks: SubTask[] = [
         { id: `${now}a`, title: "Riset dan Kumpulkan Materi", assignedTo: "Evan Varian", avatarSeed: "evan", status: "todo" },
@@ -216,20 +184,16 @@ export function TaskManagement() {
       const updatedTask = { ...selectedTask, subtasks: aiSubtasks };
       const updatedTasks = tasks.map((t) => (t.id === selectedTask.id ? updatedTask : t));
 
-      // Persist to localStorage — MyTask.tsx will read these
       setTasks(updatedTasks);
       setSelectedTask(updatedTask);
       setIsGeneratingAI(false);
     }, 2500);
   };
 
-  // ── Toggle subtask status from details modal ────────────────────────────────
   const toggleSubtaskStatus = (subtaskId: string) => {
     if (!selectedTask) return;
     const updatedSubtasks = selectedTask.subtasks.map((s) =>
-      s.id === subtaskId
-        ? { ...s, status: s.status === "completed" ? ("todo" as const) : ("completed" as const) }
-        : s
+      s.id === subtaskId ? { ...s, status: s.status === "completed" ? ("todo" as const) : ("completed" as const) } : s
     );
     const updatedTask = { ...selectedTask, subtasks: updatedSubtasks };
     const updatedTasks = tasks.map((t) => (t.id === selectedTask.id ? updatedTask : t));
@@ -242,65 +206,61 @@ export function TaskManagement() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Task Management</h1>
+          <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Task Management</h1>
           <p className="text-muted-foreground mt-1">
-            Create and manage tasks for <span className="font-semibold text-blue-600">{activeTeam}</span>
+            Create and manage tasks for <span className="font-semibold text-blue-600 dark:text-blue-400">{activeTeam}</span>
           </p>
         </div>
         <Button
-          className="gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 shadow-md text-white px-6"
+          className="gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 shadow-md text-white px-6 dark:shadow-none"
           onClick={openCreateDialog}
         >
           <Plus className="w-4 h-4" /> Create Task
         </Button>
       </div>
 
-      {/* ── Create / Edit Dialog ── */}
+      {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="rounded-2xl max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
+        <DialogContent className="rounded-2xl max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 border dark:border-slate-800">
           <DialogHeader>
-            <DialogTitle>{editingTask ? "Edit Task" : `Create Task for ${activeTeam}`}</DialogTitle>
+            <DialogTitle className="text-slate-900 dark:text-slate-50">{editingTask ? "Edit Task" : `Create Task for ${activeTeam}`}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            {/* Title */}
             <div className="space-y-2">
               <Label htmlFor="title">Task Title</Label>
-              <Input id="title" placeholder="e.g. Develop Mobile App UI" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} className="rounded-xl" />
+              <Input id="title" placeholder="e.g. Develop Mobile App UI" value={formData.title} onChange={(e) => setFormData({ ...formData, title: e.target.value })} className="rounded-xl dark:bg-slate-950 dark:border-slate-800" />
             </div>
-            {/* Description */}
             <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
-              <Textarea id="description" placeholder="Describe the overall goal of this task..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="rounded-xl min-h-[100px]" />
+              <Textarea id="description" placeholder="Describe the overall goal of this task..." value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="rounded-xl min-h-[100px] dark:bg-slate-950 dark:border-slate-800" />
             </div>
-            {/* Attachment */}
             <div className="space-y-2">
               <Label>Reference Material (PDF/Docs)</Label>
               {!formData.attachment ? (
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 dark:border-slate-800 border-dashed rounded-xl cursor-pointer bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors">
                   <div className="flex flex-col items-center justify-center pt-5 pb-6">
                     <UploadCloud className="w-8 h-8 text-slate-400 mb-2" />
-                    <p className="text-sm text-slate-500"><span className="font-semibold text-blue-600">Click to upload</span> or drag and drop</p>
-                    <p className="text-xs text-slate-400 mt-1">PDF, DOCX, or Images (Max 10MB)</p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400"><span className="font-semibold text-blue-600 dark:text-blue-400">Click to upload</span> or drag and drop</p>
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">PDF, DOCX, or Images (Max 10MB)</p>
                   </div>
                   <input type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.png,.jpg" />
                 </label>
               ) : (
-                <div className="flex items-center justify-between p-3 border border-slate-200 rounded-xl bg-slate-50">
+                <div className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center"><FileText className="w-5 h-5" /></div>
-                    <div><span className="text-sm font-medium text-slate-700">{formData.attachment}</span><br /><span className="text-xs text-slate-400">Ready to upload</span></div>
+                    <div className="w-10 h-10 bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 rounded-lg flex items-center justify-center"><FileText className="w-5 h-5" /></div>
+                    <div><span className="text-sm font-medium text-slate-700 dark:text-slate-300">{formData.attachment}</span><br /><span className="text-xs text-slate-400 dark:text-slate-500">Ready to upload</span></div>
                   </div>
                   <Button variant="ghost" size="icon" onClick={removeAttachment} className="text-slate-400 hover:text-red-500"><X className="w-4 h-4" /></Button>
                 </div>
               )}
             </div>
-            {/* Difficulty + Due Date */}
             <div className="grid grid-cols-2 gap-4 pt-2">
               <div className="space-y-2">
                 <Label>Overall Difficulty</Label>
                 <Select value={formData.difficulty} onValueChange={(v) => setFormData({ ...formData, difficulty: v as Task["difficulty"] })}>
-                  <SelectTrigger className="rounded-xl bg-white"><SelectValue placeholder="Select difficulty" /></SelectTrigger>
-                  <SelectContent className="bg-white">
+                  <SelectTrigger className="rounded-xl bg-white dark:bg-slate-950 dark:border-slate-800"><SelectValue placeholder="Select difficulty" /></SelectTrigger>
+                  <SelectContent className="bg-white dark:bg-slate-950 dark:border-slate-800 text-slate-900 dark:text-slate-50">
                     <SelectItem value="easy">Easy</SelectItem>
                     <SelectItem value="medium">Medium</SelectItem>
                     <SelectItem value="hard">Hard</SelectItem>
@@ -312,12 +272,12 @@ export function TaskManagement() {
                 <Label>Final Due Date</Label>
                 <Popover>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left font-normal rounded-xl bg-white">
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.dueDate ? format(new Date(formData.dueDate), "PPP") : "Pick a date"}
+                    <Button variant="outline" className="w-full justify-start text-left font-normal rounded-xl bg-white dark:bg-slate-950 dark:border-slate-800">
+                      <CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
+                      {formData.dueDate ? format(new Date(formData.dueDate), "PPP") : <span className="text-slate-400">Pick a date</span>}
                     </Button>
                   </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0 rounded-2xl bg-white">
+                  <PopoverContent className="w-auto p-0 rounded-2xl bg-white dark:bg-slate-950 border dark:border-slate-800">
                     <Calendar
                       mode="single"
                       selected={formData.dueDate ? new Date(formData.dueDate) : undefined}
@@ -328,20 +288,13 @@ export function TaskManagement() {
                 </Popover>
               </div>
             </div>
-            {/* Tags */}
             <div className="space-y-2">
               <Label htmlFor="tags">Tags (comma-separated)</Label>
-              <Input
-                id="tags"
-                placeholder="e.g., frontend, design, urgent"
-                value={formData.tags?.join(", ")}
-                onChange={(e) => setFormData({ ...formData, tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })}
-                className="rounded-xl"
-              />
+              <Input id="tags" placeholder="e.g., frontend, design, urgent" value={formData.tags?.join(", ")} onChange={(e) => setFormData({ ...formData, tags: e.target.value.split(",").map((t) => t.trim()).filter(Boolean) })} className="rounded-xl dark:bg-slate-950 dark:border-slate-800" />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="rounded-xl">Cancel</Button>
+            <Button variant="outline" onClick={() => { setDialogOpen(false); resetForm(); }} className="rounded-xl border dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</Button>
             <Button onClick={editingTask ? handleUpdateTask : handleCreateTask} className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 text-white">
               {editingTask ? "Update Task" : "Create Task"}
             </Button>
@@ -349,58 +302,55 @@ export function TaskManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Task Details + AI Breakdown Dialog ── */}
+      {/* Task Details + AI Breakdown Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="rounded-2xl max-w-3xl bg-white transition-all">
+        <DialogContent className="rounded-2xl max-w-3xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 border dark:border-slate-800 transition-all">
           {selectedTask && (
             <>
               <DialogHeader>
                 <div className="flex items-center gap-2 mb-2">
                   <Badge className={`${getDifficultyColor(selectedTask.difficulty)} text-white border-none px-3 py-1`}>{selectedTask.difficulty}</Badge>
                 </div>
-                <DialogTitle className="text-2xl">{selectedTask.title}</DialogTitle>
-                <DialogDescription className="text-base mt-2 text-slate-700">{selectedTask.description}</DialogDescription>
+                <DialogTitle className="text-2xl text-slate-900 dark:text-slate-50">{selectedTask.title}</DialogTitle>
+                <DialogDescription className="text-base mt-2 text-slate-700 dark:text-slate-300">{selectedTask.description}</DialogDescription>
                 {selectedTask.attachment && (
-                  <div className="mt-4 p-3 border border-slate-200 rounded-xl bg-slate-50 flex items-center gap-3 w-fit pr-8">
-                    <div className="w-10 h-10 bg-red-100 text-red-600 rounded-lg flex items-center justify-center"><FileText className="w-5 h-5" /></div>
+                  <div className="mt-4 p-3 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 flex items-center gap-3 w-fit pr-8">
+                    <div className="w-10 h-10 bg-red-100 dark:bg-red-950 text-red-600 dark:text-red-400 rounded-lg flex items-center justify-center"><FileText className="w-5 h-5" /></div>
                     <div className="flex flex-col flex-1">
-                      <span className="text-xs text-slate-500 font-medium uppercase tracking-wider">Reference File</span>
-                      <span className="text-sm font-semibold text-blue-600 hover:underline cursor-pointer">{selectedTask.attachment}</span>
+                      <span className="text-xs text-slate-500 dark:text-slate-500 font-medium uppercase tracking-wider">Reference File</span>
+                      <span className="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline cursor-pointer">{selectedTask.attachment}</span>
                     </div>
                   </div>
                 )}
               </DialogHeader>
 
-              <div className="py-4 space-y-4 border-t mt-4">
+              <div className="py-4 space-y-4 border-t dark:border-slate-800 mt-4">
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold flex items-center gap-2">
-                    <ListChecks className="w-5 h-5 text-indigo-600" /> Sub-tasks Breakdown
+                  <h3 className="font-semibold flex items-center gap-2 text-slate-900 dark:text-slate-50">
+                    <ListChecks className="w-5 h-5 text-indigo-600 dark:text-indigo-400" /> Sub-tasks Breakdown
                   </h3>
-                  <Badge variant="secondary" className="bg-indigo-50 text-indigo-700">{selectedTask.subtasks.length} tasks</Badge>
+                  <Badge variant="secondary" className="bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400">{selectedTask.subtasks.length} tasks</Badge>
                 </div>
 
                 <div className="grid gap-3 min-h-[150px]">
                   {isGeneratingAI && (
-                    <div className="flex flex-col items-center justify-center py-10 bg-slate-50/50 rounded-xl border border-slate-200">
+                    <div className="flex flex-col items-center justify-center py-10 bg-slate-50/50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800">
                       <Loader2 className="w-10 h-10 text-indigo-500 animate-spin mb-4" />
-                      <p className="text-slate-700 font-medium">AI is analyzing the task...</p>
+                      <p className="text-slate-700 dark:text-slate-300 font-medium">AI is analyzing the task...</p>
                       <p className="text-slate-500 text-sm mt-1 text-center max-w-sm">Breaking down and assigning to team members based on skill.</p>
                     </div>
                   )}
 
                   {!isGeneratingAI && selectedTask.subtasks.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-10 bg-slate-50/50 rounded-xl border border-dashed border-slate-300">
-                      <div className="w-12 h-12 bg-indigo-50 rounded-full flex items-center justify-center mb-3">
+                    <div className="flex flex-col items-center justify-center py-10 bg-slate-50/50 dark:bg-slate-950/50 rounded-xl border border-dashed border-slate-300 dark:border-slate-800">
+                      <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/50 rounded-full flex items-center justify-center mb-3">
                         <Sparkles className="w-6 h-6 text-indigo-500" />
                       </div>
-                      <p className="text-slate-700 font-medium">No sub-tasks yet.</p>
-                      <p className="text-slate-500 text-sm mt-1 mb-5 text-center max-w-sm">
-                        Let AI read the description and <span className="font-semibold text-slate-700">reference file</span>, then auto-assign sub-tasks to the team.
+                      <p className="text-slate-700 dark:text-slate-300 font-medium">No sub-tasks yet.</p>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm mt-1 mb-5 text-center max-w-sm">
+                        Let AI read the description and <span className="font-semibold text-slate-700 dark:text-slate-300">reference file</span>, then auto-assign sub-tasks to the team.
                       </p>
-                      <Button
-                        onClick={handleRunAI}
-                        className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white shadow-md px-6"
-                      >
+                      <Button onClick={handleRunAI} className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white shadow-md px-6 dark:shadow-none">
                         <Sparkles className="w-4 h-4 mr-2" /> Breakdown with AI
                       </Button>
                     </div>
@@ -409,11 +359,11 @@ export function TaskManagement() {
                   {!isGeneratingAI && selectedTask.subtasks.map((sub) => (
                     <div
                       key={sub.id}
-                      className="flex items-center justify-between p-4 border rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer animate-in fade-in slide-in-from-bottom-2"
+                      className="flex items-center justify-between p-4 border dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors cursor-pointer"
                       onClick={() => toggleSubtaskStatus(sub.id)}
                     >
                       <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${sub.status === "completed" ? "bg-green-500 border-green-500" : "border-slate-300 bg-white"}`}>
+                        <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${sub.status === "completed" ? "bg-green-500 border-green-500" : "border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900"}`}>
                           {sub.status === "completed" && (
                             <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
@@ -421,21 +371,21 @@ export function TaskManagement() {
                           )}
                         </div>
                         <div>
-                          <span className={`font-medium ${sub.status === "completed" ? "text-slate-400 line-through" : "text-slate-900"}`}>{sub.title}</span>
-                          <p className="text-xs text-slate-400 mt-0.5">Click to toggle status</p>
+                          <span className={`font-medium ${sub.status === "completed" ? "text-slate-400 dark:text-slate-500 line-through" : "text-slate-900 dark:text-slate-100"}`}>{sub.title}</span>
+                          <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">Click to toggle status</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Avatar className="w-8 h-8 border border-slate-200">
-                          <AvatarFallback className="bg-white text-xs font-semibold text-slate-700">
+                        <Avatar className="w-8 h-8 border border-slate-200 dark:border-slate-800">
+                          <AvatarFallback className="bg-white dark:bg-slate-800 text-xs font-semibold text-slate-700 dark:text-slate-300">
                             {sub.assignedTo.split(" ").map((n) => n[0]).join("")}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="text-sm font-medium text-slate-700 w-28 truncate">{sub.assignedTo}</span>
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300 w-28 truncate">{sub.assignedTo}</span>
                         <Badge variant="outline" className={`text-[10px] ${
-                          sub.status === "completed" ? "bg-green-50 text-green-700 border-green-200" :
-                          sub.status === "in-progress" ? "bg-blue-50 text-blue-700 border-blue-200" :
-                          "bg-slate-50 text-slate-500"
+                          sub.status === "completed" ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-900/50" :
+                          sub.status === "in-progress" ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50" :
+                          "bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400"
                         }`}>
                           {sub.status}
                         </Badge>
@@ -449,13 +399,13 @@ export function TaskManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* ── Task List ── */}
+      {/* Task List */}
       <div className="grid gap-4">
         {currentTeamTasks.map((task) => (
           <Card
             key={task.id}
             onClick={() => openTaskDetails(task)}
-            className="rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-200 transition-all cursor-pointer group bg-white border-slate-200"
+            className="rounded-2xl shadow-sm hover:shadow-md hover:border-indigo-200 dark:hover:border-indigo-900 transition-all cursor-pointer group bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
           >
             <CardContent className="p-6">
               <div className="flex items-start justify-between">
@@ -463,7 +413,7 @@ export function TaskManagement() {
                   <div className="flex items-start gap-3">
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-lg group-hover:text-indigo-600 transition-colors">{task.title}</h3>
+                        <h3 className="font-semibold text-lg text-slate-900 dark:text-slate-50 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">{task.title}</h3>
                         {task.attachment && <Paperclip className="w-4 h-4 text-slate-400" />}
                       </div>
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-1">{task.description}</p>
@@ -471,15 +421,15 @@ export function TaskManagement() {
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <Badge className={`${getDifficultyColor(task.difficulty)} text-white rounded-md border-none px-3`}>{task.difficulty}</Badge>
-                    <Badge variant="outline" className="rounded-md gap-1 bg-slate-50">
+                    <Badge variant="outline" className="rounded-md gap-1 bg-slate-50 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-400">
                       <CalendarIcon className="w-3 h-3 text-slate-400" />
                       {format(new Date(task.dueDate), "MMM dd")}
                     </Badge>
-                    <Badge variant="outline" className="rounded-md gap-1 bg-indigo-50 text-indigo-700 border-indigo-200">
+                    <Badge variant="outline" className="rounded-md gap-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/50">
                       <Users className="w-3 h-3" />{task.subtasks.length} Sub-tasks
                     </Badge>
                     {task.subtasks.length > 0 && (
-                      <Badge variant="outline" className="rounded-md gap-1 bg-green-50 text-green-700 border-green-200">
+                      <Badge variant="outline" className="rounded-md gap-1 bg-green-50 dark:bg-green-950/40 text-green-700 dark:text-green-400 border-green-200 dark:border-green-900/50">
                         {task.subtasks.filter((s) => s.status === "completed").length}/{task.subtasks.length} done
                       </Badge>
                     )}
@@ -487,23 +437,23 @@ export function TaskManagement() {
                 </div>
 
                 <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
-                  <Button variant="outline" size="icon" onClick={() => openEditDialog(task)} className="rounded-xl hover:bg-blue-50 hover:text-blue-600 border-slate-200">
+                  <Button variant="outline" size="icon" onClick={() => openEditDialog(task)} className="rounded-xl hover:bg-blue-50 dark:hover:bg-blue-950/30 hover:text-blue-600 dark:hover:text-blue-400 border-slate-200 dark:border-slate-800 dark:bg-slate-900">
                     <Edit className="w-4 h-4" />
                   </Button>
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
-                      <Button variant="outline" size="icon" className="rounded-xl text-red-600 hover:text-red-700 hover:bg-red-50 border-slate-200">
+                      <Button variant="outline" size="icon" className="rounded-xl text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/30 border-slate-200 dark:border-slate-800 dark:bg-slate-900">
                         <Trash2 className="w-4 h-4" />
                       </Button>
                     </AlertDialogTrigger>
-                    <AlertDialogContent className="rounded-2xl bg-white">
+                    <AlertDialogContent className="rounded-2xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 border dark:border-slate-800">
                       <AlertDialogHeader>
                         <AlertDialogTitle>Delete Task?</AlertDialogTitle>
-                        <AlertDialogDescription>This will permanently delete "{task.title}" and all its sub-tasks.</AlertDialogDescription>
+                        <AlertDialogDescription className="dark:text-slate-400">This will permanently delete "{task.title}" and all its sub-tasks.</AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
-                        <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={() => handleDeleteTask(task.id)} className="rounded-xl bg-red-600 hover:bg-red-700 text-white">Delete</AlertDialogAction>
+                        <AlertDialogCancel className="rounded-xl dark:border-slate-800 dark:hover:bg-slate-800">Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDeleteTask(task.id)} className="rounded-xl bg-red-600 hover:bg-red-700 text-white border-none">Delete</AlertDialogAction>
                       </AlertDialogFooter>
                     </AlertDialogContent>
                   </AlertDialog>
@@ -516,14 +466,11 @@ export function TaskManagement() {
 
       {/* Empty state */}
       {currentTeamTasks.length === 0 && (
-        <Card className="rounded-2xl border-dashed border-2 bg-transparent shadow-none mt-8">
-          <CardContent className="flex flex-col items-center justify-center py-5">
-            {/* <div className="w-14 h-14 rounded-full bg-blue-50 text-blue-500 flex items-center justify-center mb-4 shadow-sm">
-              <Plus className="w-6 h-6" />
-            </div> */}
-            <h3 className="font-semibold text-xl mb-1 text-slate-900">No Tasks Yet</h3>
-            <p className="text-sm text-slate-500">
-              Create the first task for <span className="font-semibold text-slate-700">{activeTeam}</span>.
+        <Card className="rounded-2xl border-dashed border-2 bg-transparent border-slate-200 dark:border-slate-800 shadow-none mt-8">
+          <CardContent className="flex flex-col items-center justify-center py-10">
+            <h3 className="font-semibold text-xl mb-1 text-slate-900 dark:text-slate-50">No Tasks Yet</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">
+              Create the first task for <span className="font-semibold text-slate-700 dark:text-slate-300">{activeTeam}</span>.
             </p>
           </CardContent>
         </Card>
