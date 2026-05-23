@@ -15,7 +15,6 @@ type LoginFormInputs = z.infer<typeof loginSchema>;
 export default function LoginPage() {
   const navigate = useNavigate();
   
-  // State untuk efek loading dan pesan error dari backend
   const [isLoading, setIsLoading] = useState(false);
   const [serverError, setServerError] = useState("");
 
@@ -32,40 +31,47 @@ export default function LoginPage() {
     setServerError("");
 
     try {
-      // Menembak data ke Endpoint Backend (Express)
+      // Step 1: Login
       const response = await fetch("http://localhost:3000/api/login", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          email: data.email,
-          password: data.password
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: data.email, password: data.password }),
       });
 
       const result = await response.json();
 
-      if (response.ok) {
-        // Simpan data user ke localStorage biar tidak hilang saat halaman di-refresh
-        // Ini sangat berguna nanti untuk halaman Dashboard dan Chat
-        localStorage.setItem("user", JSON.stringify(result.data));
+      if (!response.ok) {
+        setServerError(result.pesan || "Email atau password salah.");
+        return;
+      }
 
-        console.log("Login sukses! Data user:", result.data);
+      // Simpan data user ke localStorage
+      localStorage.setItem("user", JSON.stringify(result.data));
 
-        // Cek apakah user sudah punya tim. 
-        // Sesuaikan 'hasTeam' dengan nama field yang sesungguhnya dari tabel database-mu nanti
-        const userHasTeam = result.data?.hasTeam || false; 
+      // Step 2: Cek apakah user sudah punya tim via API
+      const userId = result.data?.UserID || result.data?.user_id || result.data?.id;
 
-        if (userHasTeam) {
+      try {
+        const groupRes = await fetch("http://localhost:3000/api/groupGetGroupByUserId", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user_id: userId }),
+        });
+
+        const groupResult = await groupRes.json();
+
+        // Jika user sudah punya minimal 1 tim → langsung ke dashboard
+        if (groupRes.ok && groupResult.status === "sukses" && groupResult.data?.length > 0) {
           navigate('/dashboard');
         } else {
+          // Belum punya tim → ke onboarding
           navigate('/onboarding');
         }
-      } else {
-        // Jika gagal (Misal: password salah atau email tidak ditemukan)
-        setServerError(result.pesan || "Email atau password salah.");
+      } catch {
+        // Jika gagal cek grup (misal network error), tetap lanjut ke onboarding
+        navigate('/onboarding');
       }
+
     } catch (error) {
       console.error("Gagal koneksi ke backend:", error);
       setServerError("Tidak bisa terhubung ke server.");
@@ -93,7 +99,6 @@ export default function LoginPage() {
         <h2 className="text-2xl font-bold text-slate-900 mb-2">Welcome back</h2>
         <p className="text-slate-500 mb-6">Please enter your details to sign in.</p>
 
-        {/* --- Menampilkan Pesan Error dari Backend --- */}
         {serverError && (
           <div className="p-3 mb-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200">
             {serverError}
