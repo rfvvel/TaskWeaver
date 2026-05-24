@@ -197,7 +197,7 @@ export function Team() {
           <CardContent className="space-y-4 pt-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">Invite Code</label>
-              <Input placeholder="e.g. TW-8X9P2" className={`bg-white uppercase tracking-widest ${joinCodeError ? "border-red-500 focus-visible:ring-red-500" : ""}`} value={joinCode} onChange={(e) => { setJoinCode(e.target.value); if (joinCodeError) setJoinCodeError(""); }} />
+              <Input placeholder="e.g. TW-8X9P2" className={`bg-white uppercase tracking-widest ${joinCodeError ? "border-red-500 focus-visible:ring-red-500" : ""}`} value={joinCode} onChange={(e) => { setJoinCode(e.target.value.toUpperCase()); if (joinCodeError) setJoinCodeError(""); }} />
                {joinCodeError && <p className="text-xs text-red-500 font-medium">{joinCodeError}</p>}
             </div>
             <div className="h-[72px]"></div> 

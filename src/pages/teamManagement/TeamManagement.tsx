@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { Users, LogOut, Search, Mail, Shield, CheckCircle2, Circle, Clock, Plus, LogIn, Copy, Check, AlignLeft, ClipboardList } from "lucide-react";
+import { Users, LogOut, CheckCircle2, Circle, Clock, Plus, LogIn, Copy, Check, AlignLeft, ClipboardList, Loader2 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -29,6 +29,8 @@ export function TeamManagement() {
   
   const [joinDialogOpen, setJoinDialogOpen] = useState(false); 
   const [inviteCodeInput, setInviteCodeInput] = useState("");
+  const [joinCodeError, setJoinCodeError] = useState("");
+  const [isJoining, setIsJoining] = useState(false);
 
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [newTeamName, setNewTeamName] = useState("");
@@ -69,24 +71,50 @@ export function TeamManagement() {
               const memData = await memRes.json();
               
               if (memRes.ok && memData.status === "sukses") {
-                membersList = memData.data.map((m: any) => ({
-                  id: String(m.user_id || m.id || Math.random()),
-                  name: m.user_fullname || m.UserFullName || m.name || `User ${m.user_id}`,
-                  email: m.user_email || m.UserEmail || m.email || "No Email",
-                  role: (m.user_role === 'A' || m.role === 'admin') ? "admin" : "member",
-                  avatarSeed: m.user_fullname || m.UserFullName || "user",
-                  joinDate: "Joined recently"
-                }));
+                membersList = memData.data.map((m: any) => {
+                  const extractedName = m.user_full_name || m.user_fullname || m.username || m.name || `User ${m.user_id}`;
+                  const userRole = (m.user_role || '').trim().toUpperCase();
+                  
+                  return {
+                    id: String(m.user_id || m.id || Math.random()),
+                    name: extractedName,
+                    email: m.user_email || m.email || "No Email",
+                    role: userRole === 'A' ? "admin" : "member",
+                    avatarSeed: extractedName,
+                    joinDate: m.join_date ? new Date(m.join_date).toLocaleDateString() : "Joined recently"
+                  };
+                });
               }
             } catch (e) {
               console.error(`Gagal mengambil member untuk grup ${g.group_id}`, e);
+            }
+
+            let inviteCode = g.group_invite_code || g.group_invitecode || g.invite_code || null;
+
+            if (!inviteCode) {
+              try {
+                const invRes = await fetch("http://localhost:3000/api/groupGetInviteCode", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ group_id: g.group_id })
+                });
+                const invData = await invRes.json();
+                if (invRes.ok && invData.status === "sukses" && invData.data?.[0]) {
+                  inviteCode = invData.data[0].group_invitecode 
+                            || invData.data[0].invite_code 
+                            || invData.data[0].group_invite_code 
+                            || null;
+                }
+              } catch (e) {
+                console.error(`Gagal mengambil invite code untuk grup ${g.group_id}`, e);
+              }
             }
 
             return {
               id: String(g.group_id),
               name: g.group_name,
               description: g.group_description || "No description provided.",
-              inviteCode: g.group_invite_code || "---",
+              inviteCode: inviteCode || "No invite code",
               members: membersList,
               bigTasks: []
             };
@@ -100,7 +128,7 @@ export function TeamManagement() {
           }
         }
       } catch (error) {
-        console.error("❌ Gagal menarik data:", error);
+        console.error("❌ Gagal memproses data workspace:", error);
       }
     };
 
@@ -120,13 +148,50 @@ export function TeamManagement() {
     navigator.clipboard.writeText(code); setCopiedCode(code); setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const handleLeaveTeam = (teamId: string) => {
-    const teamToLeave = teams.find(t => t.id === teamId);
-    const updatedTeams = teams.filter(team => team.id !== teamId);
-    setTeams(updatedTeams);
-    
-    if (teamToLeave?.name === activeTeam) {
-      setActiveTeam(updatedTeams.length > 0 ? updatedTeams[0].name : "No Team");
+  const handleLeaveTeam = async (teamId: string) => {
+    const user = getLoggedInUser();
+    if (!user) {
+      alert("Login session lost. Please log in again.");
+      return;
+    }
+    const userId = user.UserID || user.id || user.user_id;
+
+    try {
+      const response = await fetch("http://localhost:3000/api/groupKick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          group_id: teamId, 
+          user_id: userId, 
+          user_requester_id: userId 
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status === "sukses") {
+        const teamToLeave = teams.find(t => t.id === teamId);
+        const updatedTeams = teams.filter(team => team.id !== teamId);
+        
+        setTeams(updatedTeams); 
+        
+        if (teamToLeave?.name === activeTeam) {
+          const nextTeam = updatedTeams.length > 0 ? updatedTeams[0].name : "No Team";
+          setActiveTeam(nextTeam);
+          if (updatedTeams.length > 0) {
+            localStorage.setItem("tw_activeTeam", nextTeam);
+          } else {
+            localStorage.removeItem("tw_activeTeam");
+          }
+        }
+        
+        alert("Berhasil keluar dari tim!");
+      } else {
+        alert(result.pesan || "Gagal keluar dari tim.");
+      }
+    } catch (error) {
+      console.error("❌ Error Leave Team:", error);
+      alert("Tidak bisa terhubung ke server.");
     }
   };
 
@@ -136,23 +201,96 @@ export function TeamManagement() {
     return result;
   };
 
+  const handleJoinTeam = async () => {
+    if (!inviteCodeInput.trim()) {
+      setJoinCodeError("Invite Code tidak boleh kosong!");
+      return;
+    }
+
+    const user = getLoggedInUser();
+    if (!user) return;
+    const userId = user.UserID || user.id || user.user_id;
+
+    setIsJoining(true);
+    setJoinCodeError("");
+
+    try {
+      // Step 1: Validasi invite code & ambil group_id
+      const resCheck = await fetch("http://localhost:3000/api/groupGetGroupbyInviteCode", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invite_code: inviteCodeInput.toUpperCase() })
+      });
+      const resultCheck = await resCheck.json();
+
+      if (!resCheck.ok || resultCheck.status !== "sukses" || !resultCheck.data) {
+        setJoinCodeError("Invite code invalid or group does not exist.");
+        setIsJoining(false);
+        return;
+      }
+
+      const groupId = resultCheck.data.group_id || resultCheck.data.id;
+
+      // Step 2: Join group
+      const resJoin = await fetch("http://localhost:3000/api/groupJoin", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: groupId, user_id: userId, user_role: "M" })
+      });
+      const resultJoin = await resJoin.json();
+
+      if (resJoin.ok && resultJoin.status === "sukses") {
+        setJoinDialogOpen(false);
+        setInviteCodeInput("");
+        setJoinCodeError("");
+        // Refresh daftar tim
+        window.location.reload();
+      } else {
+        setJoinCodeError(resultJoin.pesan || "Gagal bergabung ke tim.");
+      }
+    } catch (error) {
+      console.error("Error Join Team:", error);
+      setJoinCodeError("Tidak bisa terhubung ke server.");
+    } finally {
+      setIsJoining(false);
+    }
+  };
+
   const handleCreateTeam = () => {
     if (!newTeamName.trim()) { setTeamNameError("Team Name tidak boleh kosong!"); return; }
 
+    const loggedInUser = getLoggedInUser();
+    const userId = loggedInUser ? String(loggedInUser.UserID || loggedInUser.id || loggedInUser.user_id || `m-${Date.now()}`) : `m-${Date.now()}`;
+    const userName = loggedInUser ? (loggedInUser.user_fullname || loggedInUser.UserFullName || loggedInUser.username || loggedInUser.name || "Unknown User") : "Unknown User";
+    const userEmail = loggedInUser ? (loggedInUser.user_email || loggedInUser.UserEmail || loggedInUser.email || "No Email") : "No Email";
+
     const newTeam: Team = {
-      id: `team-${Date.now()}`, name: newTeamName, description: newTeamDesc || "No description provided.", inviteCode: generateRandomCode(), bigTasks: [],
-      members: [ { id: `m-${Date.now()}`, name: "Rafael Vvel", email: "rafael.vvel@gmail.com", role: "admin", avatarSeed: "rafael", joinDate: `Joined ${new Date().toLocaleDateString()}` } ]
+      id: `team-${Date.now()}`, 
+      name: newTeamName, 
+      description: newTeamDesc || "No description provided.", 
+      inviteCode: generateRandomCode(), 
+      bigTasks: [],
+      members: [ 
+        { 
+          id: userId, 
+          name: userName, 
+          email: userEmail, 
+          role: "admin", 
+          avatarSeed: userName, 
+          joinDate: `Joined ${new Date().toLocaleDateString()}` 
+        } 
+      ]
     };
 
     setTeams([...teams, newTeam]);
     setActiveTeam(newTeam.name);
     setCreateDialogOpen(false); 
-    setNewTeamName(""); setNewTeamDesc("");
+    setNewTeamName(""); 
+    setNewTeamDesc("");
   };
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6 text-slate-900 dark:text-slate-100">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Team Management</h1>
@@ -160,8 +298,7 @@ export function TeamManagement() {
         </div>
         <div className="flex gap-3">
           
-          {/* Join Team Dialog */}
-          <Dialog open={joinDialogOpen} onOpenChange={setJoinDialogOpen}>
+          <Dialog open={joinDialogOpen} onOpenChange={(open) => { setJoinDialogOpen(open); if (!open) { setInviteCodeInput(""); setJoinCodeError(""); } }}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2 rounded-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700">
                 <LogIn className="w-4 h-4" /> Join Team
@@ -175,12 +312,25 @@ export function TeamManagement() {
               <div className="py-4 space-y-4">
                 <div className="space-y-2">
                   <Label className="dark:text-slate-300">Team Code</Label>
-                  <Input placeholder="e.g., TW-8X9P2" className="rounded-xl font-mono uppercase bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white" value={inviteCodeInput} onChange={(e) => setInviteCodeInput(e.target.value)} />
+                  <Input
+                    placeholder="e.g., TW-8X9P2"
+                    className={`rounded-xl font-mono uppercase tracking-widest bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white ${joinCodeError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                    value={inviteCodeInput}
+                    onChange={(e) => { setInviteCodeInput(e.target.value.toUpperCase()); if (joinCodeError) setJoinCodeError(""); }}
+                    onKeyDown={(e) => { if (e.key === "Enter") handleJoinTeam(); }}
+                  />
+                  {joinCodeError && (
+                    <p className="text-xs text-red-500 font-medium flex items-center gap-1">
+                      <span></span> {joinCodeError}
+                    </p>
+                  )}
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setJoinDialogOpen(false)} className="rounded-xl dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</Button>
-                <Button className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white" disabled={!inviteCodeInput} onClick={() => { setJoinDialogOpen(false); setInviteCodeInput(""); }}>Join Team</Button>
+                <Button variant="outline" onClick={() => { setJoinDialogOpen(false); setInviteCodeInput(""); setJoinCodeError(""); }} className="rounded-xl dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" disabled={isJoining}>Cancel</Button>
+                <Button className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white" disabled={!inviteCodeInput || isJoining} onClick={handleJoinTeam}>
+                  {isJoining ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Verifying...</> : "Join Team"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -269,7 +419,7 @@ export function TeamManagement() {
       {/* Teams Loop List */}
       <div className="space-y-8">
         {teams.map((team) => (
-          <Card key={team.id} className="rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900 animate-in slide-in-from-bottom-4 duration-300">
+          <Card key={team.id} className="rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
             <div onClick={() => openTeamTasks(team)} className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-start justify-between cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-sm shrink-0"><Users className="w-7 h-7" /></div>
@@ -312,7 +462,7 @@ export function TeamManagement() {
                         <div className="flex items-center gap-4">
                           <Avatar className="w-10 h-10 border border-slate-200 dark:border-slate-700">
                             <AvatarFallback className="bg-white dark:bg-slate-800 dark:text-slate-300">
-                              {member.name.split(" ").map(n => n[0]).join("")}
+                              {member.name ? member.name.split(" ").map(n => n[0]).join("") : "U"}
                             </AvatarFallback>
                           </Avatar>
                           <div>
