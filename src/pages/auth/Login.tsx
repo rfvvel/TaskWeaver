@@ -173,7 +173,7 @@ export default function LoginPage() {
           />
 
           <span className="text-3xl font-bold text-white tracking-wide drop-shadow-lg">
-            TaskWeaver AI
+            TaskWeaver
           </span>
         </div>
 
