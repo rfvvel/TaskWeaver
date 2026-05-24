@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Outlet, Link, useLocation } from "react-router-dom";
+import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ListTodo, Calendar as CalendarIcon, Activity,
   FolderOpen, MessageSquare, Settings as SettingsIcon, Search, Bell, ChevronDown,
@@ -29,6 +29,25 @@ const navItems = [
 
 export function Layout() {
   const location = useLocation();
+  const navigate = useNavigate();
+
+  // ── Ambil Data User Secara Dinamis dari localStorage ──────────────────────
+  const getUser = () => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
+  };
+  const user = getUser();
+  
+  // Mengambil nama lengkap (default ke "Rafael" jika kosong di localStorage)
+  const userFullName = user.UserFullName || "Rafael";
+
+  // Membuat inisial avatar secara dinamis (maksimal 2 huruf)
+  const avatarInitials = userFullName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w: string) => w[0].toUpperCase())
+    .join("") || "RV";
 
   // ── Apply saved theme immediately on mount ────────────────────────────────
   useEffect(() => {
@@ -74,8 +93,14 @@ export function Layout() {
       <aside className="w-64 bg-card border-r border-border flex flex-col shadow-sm">
         <div className="h-20 flex items-center px-6 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
-            <img src={LogoTW2} alt="TaskWeaver Logo" className="w-10 h-10 object-cover rounded-md mix-blend-multiply" />
-            <h1 className="text-xl font-bold text-blue-600">TaskWeaver AI</h1>
+            {/* Mengubah kelas gambar agar mengikuti tema light/dark tanpa efek hitam multiply */}
+            <img 
+              src={LogoTW2} 
+              alt="TaskWeaver Logo" 
+              className="w-10 h-10 object-contain rounded-md bg-transparent" 
+            />
+            {/* Nama diubah dari "TaskWeaver AI" menjadi "TaskWeaver" saja */}
+            <h1 className="text-xl font-bold text-blue-600 dark:text-blue-400">TaskWeaver</h1>
           </div>
         </div>
 
@@ -88,7 +113,7 @@ export function Layout() {
                 to={path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                   isActive
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-none"
                     : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
               >
@@ -99,15 +124,21 @@ export function Layout() {
           })}
         </nav>
 
+        {/* Bagian Profile Bawah yang Terhubung ke Back-End & Navigasi Settings */}
         <div className="p-4 border-t border-border">
-          <div className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent cursor-pointer transition-colors">
+          <div 
+            onClick={() => navigate("/settings")}
+            className="flex items-center gap-3 p-3 rounded-xl hover:bg-accent cursor-pointer transition-colors border border-transparent hover:border-border"
+          >
             <Avatar className="w-9 h-9">
-              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-cyan-500 text-white font-bold">
-                RV
+              <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-cyan-500 text-white font-bold text-sm">
+                {avatarInitials}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">Rafael</p>
+              <p className="text-sm font-medium text-foreground truncate">
+                {userFullName}
+              </p>
             </div>
           </div>
         </div>

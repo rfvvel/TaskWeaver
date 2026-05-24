@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Bell, Lock, User, Palette, Zap, Plus, X, Check,
-  Code2, BookOpen, Star, Globe, Brain, Briefcase, LogOut
+  Code2, BookOpen, Star, Globe, Brain, Briefcase, LogOut, Loader2
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -13,68 +13,56 @@ import { Separator } from "../../components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 
-// ─── Skill Config ─────────────────────────────────────────────────────────────
+// ─── Skill Config ──────────────────────────────────────────────────────────────
 
-/**
- * Preset category suggestions — user can pick one OR type anything custom.
- * Each entry has a color palette for the badge.
- */
 const SUGGESTED_CATEGORIES: { label: string; color: string }[] = [
-  // Tech
-  { label: "Frontend",           color: "bg-blue-100   text-blue-700   border-blue-200" },
-  { label: "Backend",            color: "bg-green-100  text-green-700  border-green-200" },
-  { label: "Database",           color: "bg-orange-100 text-orange-700 border-orange-200" },
-  { label: "DevOps / Cloud",     color: "bg-purple-100 text-purple-700 border-purple-200" },
-  { label: "Mobile",             color: "bg-cyan-100   text-cyan-700   border-cyan-200" },
-  { label: "AI / ML",            color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
-  { label: "UI/UX Design",       color: "bg-pink-100   text-pink-700   border-pink-200" },
-  { label: "Testing / QA",       color: "bg-red-100    text-red-700    border-red-200" },
-  // Creative
-  { label: "Graphic Design",     color: "bg-rose-100   text-rose-700   border-rose-200" },
-  { label: "Photography",        color: "bg-amber-100  text-amber-700  border-amber-200" },
-  { label: "Videography",        color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  { label: "Music",              color: "bg-lime-100   text-lime-700   border-lime-200" },
-  { label: "Art / Illustration", color: "bg-teal-100   text-teal-700   border-teal-200" },
-  { label: "Writing",            color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  { label: "Content Creation",   color: "bg-fuchsia-100 text-fuchsia-700 border-fuchsia-200" },
-  // Business & Management
-  { label: "Project Management", color: "bg-sky-100    text-sky-700    border-sky-200" },
-  { label: "Marketing",          color: "bg-orange-100 text-orange-700 border-orange-200" },
-  { label: "Finance",            color: "bg-green-100  text-green-700  border-green-200" },
-  { label: "Sales",              color: "bg-blue-100   text-blue-700   border-blue-200" },
-  { label: "Legal",              color: "bg-slate-100  text-slate-700  border-slate-200" },
-  { label: "HR / Recruiting",    color: "bg-violet-100 text-violet-700 border-violet-200" },
-  { label: "Accounting",         color: "bg-cyan-100   text-cyan-700   border-cyan-200" },
-  // Science & Education
-  { label: "Research / Analysis",color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
-  { label: "Education",          color: "bg-amber-100  text-amber-700  border-amber-200" },
-  { label: "Medicine",           color: "bg-red-100    text-red-700    border-red-200" },
-  { label: "Psychology",         color: "bg-purple-100 text-purple-700 border-purple-200" },
-  { label: "Environment",        color: "bg-green-100  text-green-700  border-green-200" },
-  // Language & Communication
-  { label: "Foreign Language",   color: "bg-rose-100   text-rose-700   border-rose-200" },
-  { label: "Translation",        color: "bg-pink-100   text-pink-700   border-pink-200" },
-  { label: "Public Speaking",    color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  // Sports & Lifestyle
-  { label: "Sports",             color: "bg-lime-100   text-lime-700   border-lime-200" },
-  { label: "Health & Wellness",  color: "bg-emerald-100 text-emerald-700 border-emerald-200" },
-  { label: "Culinary",           color: "bg-orange-100 text-orange-700 border-orange-200" },
-  // General
-  { label: "Soft Skill",         color: "bg-yellow-100 text-yellow-700 border-yellow-200" },
-  { label: "Other",              color: "bg-slate-100  text-slate-700  border-slate-200" },
+  { label: "Frontend",           color: "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900" },
+  { label: "Backend",            color: "bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900" },
+  { label: "Database",           color: "bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900" },
+  { label: "DevOps / Cloud",     color: "bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-900" },
+  { label: "Mobile",             color: "bg-cyan-100 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-900" },
+  { label: "AI / ML",            color: "bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900" },
+  { label: "UI/UX Design",       color: "bg-pink-100 dark:bg-pink-950/40 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-900" },
+  { label: "Testing / QA",       color: "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900" },
+  { label: "Graphic Design",     color: "bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900" },
+  { label: "Photography",        color: "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900" },
+  { label: "Videography",        color: "bg-yellow-100 dark:bg-yellow-950/40 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-900" },
+  { label: "Music",              color: "bg-lime-100 dark:bg-lime-950/40 text-lime-700 dark:text-lime-300 border-lime-200 dark:border-lime-900" },
+  { label: "Art / Illustration", color: "bg-teal-100 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-900" },
+  { label: "Writing",            color: "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900" },
+  { label: "Content Creation",   color: "bg-fuchsia-100 dark:bg-fuchsia-950/40 text-fuchsia-700 dark:text-fuchsia-300 border-fuchsia-200 dark:border-fuchsia-900" },
+  { label: "Project Management", color: "bg-sky-100 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border-sky-200 dark:border-sky-900" },
+  { label: "Marketing",          color: "bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900" },
+  { label: "Finance",            color: "bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900" },
+  { label: "Sales",              color: "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900" },
+  { label: "Legal",              color: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700" },
+  { label: "HR / Recruiting",    color: "bg-violet-100 dark:bg-violet-950/40 text-violet-700 dark:text-violet-300 border-violet-200 dark:border-violet-900" },
+  { label: "Accounting",         color: "bg-cyan-100 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300 border-cyan-200 dark:border-cyan-900" },
+  { label: "Research / Analysis",color: "bg-indigo-100 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-900" },
+  { label: "Education",          color: "bg-amber-100 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900" },
+  { label: "Medicine",           color: "bg-red-100 dark:bg-red-950/40 text-red-700 dark:text-red-300 border-red-200 dark:border-red-900" },
+  { label: "Psychology",         color: "bg-purple-100 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-900" },
+  { label: "Environment",        color: "bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900" },
+  { label: "Foreign Language",   color: "bg-rose-100 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-900" },
+  { label: "Translation",        color: "bg-pink-100 dark:bg-pink-950/40 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-900" },
+  { label: "Public Speaking",    color: "bg-yellow-100 dark:bg-yellow-950/40 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-900" },
+  { label: "Sports",             color: "bg-lime-100 dark:bg-lime-950/40 text-lime-700 dark:text-lime-300 border-lime-200 dark:border-lime-900" },
+  { label: "Health & Wellness",  color: "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900" },
+  { label: "Culinary",           color: "bg-orange-100 dark:bg-orange-950/40 text-orange-700 dark:text-orange-300 border-orange-200 dark:border-orange-900" },
+  { label: "Soft Skill",         color: "bg-yellow-100 dark:bg-yellow-950/40 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-900" },
+  { label: "Other",              color: "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700" },
 ];
 
 const PROFICIENCY_LEVELS = ["Beginner", "Intermediate", "Advanced", "Expert"];
 
 const PROFICIENCY_COLORS: Record<string, string> = {
-  Beginner:     "bg-slate-100  text-slate-600",
-  Intermediate: "bg-blue-100   text-blue-700",
-  Advanced:     "bg-indigo-100 text-indigo-700",
-  Expert:       "bg-purple-100 text-purple-700",
+  Beginner:     "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400",
+  Intermediate: "bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400",
+  Advanced:     "bg-indigo-100 dark:bg-indigo-950/60 text-indigo-700 dark:text-indigo-400",
+  Expert:       "bg-purple-100 dark:bg-purple-950/60 text-purple-700 dark:text-purple-400",
 };
 
-/** Fallback color for custom (unknown) categories */
-const FALLBACK_COLOR = "bg-slate-100 text-slate-700 border-slate-200";
+const FALLBACK_COLOR = "bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700";
 
 function getCategoryColor(cat: string) {
   return SUGGESTED_CATEGORIES.find(c => c.label === cat)?.color ?? FALLBACK_COLOR;
@@ -82,54 +70,26 @@ function getCategoryColor(cat: string) {
 
 type Skill = { id: string; name: string; category: string; level: string };
 
-type WorkPrefs = {
-  availableHoursPerWeek: number;
-  [key: string]: boolean | number;
-};
+// Format skill array → string untuk dikirim ke BE: "name,category,level|name,category,level"
+function skillsToString(skills: Skill[]): string {
+  return skills.map(s => `${s.name},${s.category},${s.level}`).join("|");
+}
 
-/** Generic task preference items — not CS-specific */
-const TASK_PREF_OPTIONS = [
-  { key: "preferResearch",       label: "Research & Analysis",          desc: "Gathering data, making reports, analysis" },
-  { key: "preferDesign",         label: "Design & Creative",            desc: "Visual design, content, illustration" },
-  { key: "preferWriting",        label: "Writing & Documentation",      desc: "Articles, reports, technical documentation" },
-  { key: "preferCoding",         label: "Programming / Technical",      desc: "Coding, debugging, system architecture" },
-  { key: "preferCommunication",  label: "Communication & Coordination", desc: "Meetings, presentations, team mediation" },
-  { key: "preferTesting",        label: "Testing & QA",                 desc: "Testing, reviews, quality control" },
-  { key: "preferMarketing",      label: "Marketing & Promotion",        desc: "Social media, ads, copywriting" },
-  { key: "preferOperations",     label: "Operations & Logistics",       desc: "Task management, scheduling, resource coordination" },
-];
+// Parse string dari BE → skill array
+function parseSkillsFromString(raw: string): Skill[] {
+  if (!raw || !raw.trim()) return [];
+  return raw.split("|").filter(Boolean).map((entry, i) => {
+    const [name = "", category = "Other", level = "Beginner"] = entry.split(",").map(s => s.trim());
+    return { id: `s-${i}-${Date.now()}`, name, category, level };
+  });
+}
 
-const defaultSkills: Skill[] = [];
-
-const defaultWorkPrefs: WorkPrefs = {
-  availableHoursPerWeek: 20,
-  preferResearch: true,
-  preferDesign: false,
-  preferWriting: true,
-  preferCoding: true,
-  preferCommunication: true,
-  preferTesting: false,
-  preferMarketing: false,
-  preferOperations: false,
-};
-
-// ─── Combobox for category input ─────────────────────────────────────────────
-function CategoryCombobox({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function CategoryCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-
   const filtered = value.trim()
-    ? SUGGESTED_CATEGORIES.filter(c =>
-        c.label.toLowerCase().includes(value.toLowerCase())
-      )
+    ? SUGGESTED_CATEGORIES.filter(c => c.label.toLowerCase().includes(value.toLowerCase()))
     : SUGGESTED_CATEGORIES;
-
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
@@ -137,35 +97,18 @@ function CategoryCombobox({
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
-
   return (
     <div ref={ref} className="relative">
-      <Input
-        value={value}
-        onChange={e => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        placeholder="Type or pick a category…"
-        className="rounded-lg h-9"
-      />
+      <Input value={value} onChange={e => { onChange(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} placeholder="Type or pick a category…" className="rounded-lg h-9" />
       {open && filtered.length > 0 && (
-        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-xl border border-border bg-popover shadow-lg">
+        <div className="absolute z-50 mt-1 w-full max-h-52 overflow-y-auto rounded-xl border border-border bg-popover text-popover-foreground shadow-lg">
           {filtered.map(c => (
-            <button
-              key={c.label}
-              type="button"
-              className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2"
-              onMouseDown={e => { e.preventDefault(); onChange(c.label); setOpen(false); }}
-            >
+            <button key={c.label} type="button" className="w-full text-left px-3 py-2 text-sm hover:bg-accent flex items-center gap-2" onMouseDown={e => { e.preventDefault(); onChange(c.label); setOpen(false); }}>
               <span className={`text-[11px] px-2 py-0.5 rounded-full border ${c.color}`}>{c.label}</span>
             </button>
           ))}
-          {/* Allow confirming a fully custom value not in list */}
           {value.trim() && !SUGGESTED_CATEGORIES.some(c => c.label.toLowerCase() === value.toLowerCase()) && (
-            <button
-              type="button"
-              className="w-full text-left px-3 py-2 text-sm text-indigo-600 hover:bg-indigo-50 font-medium flex items-center gap-2"
-              onMouseDown={e => { e.preventDefault(); setOpen(false); }}
-            >
+            <button type="button" className="w-full text-left px-3 py-2 text-sm text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 font-medium flex items-center gap-2" onMouseDown={e => { e.preventDefault(); setOpen(false); }}>
               <Plus className="w-3 h-3" /> Create category "{value}"
             </button>
           )}
@@ -175,127 +118,180 @@ function CategoryCombobox({
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────────────
 export function Settings() {
   const navigate = useNavigate();
 
-  // --- Profile ---
-  const [firstName, setFirstName] = useState("Rafael");
-  const [lastName,  setLastName]  = useState("Vvel");
-  const [email,     setEmail]     = useState("rafaelvvel@binus.ac.id");
-  const [phone,     setPhone]     = useState("");
+  // ─── User data from localStorage ──────────────────────────────────────────
+  const getUser = () => {
+    try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
+  };
+  const user = getUser();
+  const userId = user.UserID || user.user_id || user.id;
 
-  const avatarInitials =
-    `${firstName.trim().charAt(0)}${lastName.trim().charAt(0)}`.toUpperCase() || "?";
+  // ─── Profile state ─────────────────────────────────────────────────────────
+  const [fullName,  setFullName]  = useState(user.UserFullName    || "");
+  const [email,     setEmail]     = useState(user.UserEmail       || "");
+  const [phone,     setPhone]     = useState(user.UserPhoneNumber || "");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // --- Logout Handler ---
-  const handleLogout = () => {
-    // Menghapus data sesi user jika ada
-    localStorage.removeItem("user");
-    localStorage.removeItem("tw_activeTeam");
-    // Lempar kembali ke halaman login
-    navigate("/login");
+  // Avatar: inisial dari setiap kata di fullName (maks 2 huruf), contoh "Rafael Vvel" → "RV"
+  const avatarInitials = fullName
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(w => w[0].toUpperCase())
+    .join("") || "?";
+
+  const handleSaveProfile = async () => {
+    if (!fullName.trim()) return;
+    setIsSavingProfile(true);
+    setProfileMsg(null);
+    try {
+      const res = await fetch("http://localhost:3000/api/userUpdate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, user_full_name: fullName, user_email: email, user_phone_number: phone }),
+      });
+      const result = await res.json();
+      if (res.ok && result.status === "sukses") {
+        // Update localStorage supaya navbar ikut berubah
+        const updated = { ...user, UserFullName: fullName, UserEmail: email, UserPhoneNumber: phone };
+        localStorage.setItem("user", JSON.stringify(updated));
+        setProfileMsg({ ok: true, text: "Profile updated successfully!" });
+      } else {
+        setProfileMsg({ ok: false, text: result.pesan || "Failed to update profile." });
+      }
+    } catch {
+      setProfileMsg({ ok: false, text: "Cannot connect to server." });
+    } finally {
+      setIsSavingProfile(false);
+    }
   };
 
-  // --- Dark Mode ---
-  const [isDark, setIsDark] = useState<boolean>(() => {
-    return (
-      localStorage.getItem("tw_theme") === "dark" ||
-      document.documentElement.classList.contains("dark")
-    );
-  });
-
-  useEffect(() => {
-    if (isDark) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("tw_theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("tw_theme", "light");
-    }
-  }, [isDark]);
-
-  // --- Skills ---
-  const [skills, setSkills] = useState<Skill[]>(() => {
-    try {
-      const saved = localStorage.getItem("tw_user_skills");
-      return saved ? JSON.parse(saved) : defaultSkills;
-    } catch { return defaultSkills; }
-  });
-
+  // ─── Skills state ──────────────────────────────────────────────────────────
+  const [skills,           setSkills]           = useState<Skill[]>([]);
   const [showAddSkill,     setShowAddSkill]     = useState(false);
-  const [newSkillName,     setNewSkillName]      = useState("");
-  const [newSkillCategory, setNewSkillCategory]  = useState("");
-  const [newSkillLevel,    setNewSkillLevel]     = useState("Beginner");
+  const [newSkillName,     setNewSkillName]     = useState("");
+  const [newSkillCategory, setNewSkillCategory] = useState("");
+  const [newSkillLevel,    setNewSkillLevel]    = useState("Beginner");
+  const [isSavingSkills,   setIsSavingSkills]   = useState(false);
+  const [skillMsg,         setSkillMsg]         = useState<{ ok: boolean; text: string } | null>(null);
 
-  const saveSkills = (updated: Skill[]) => {
+  // Load skills dari BE saat mount
+  useEffect(() => {
+    if (!userId) return;
+    fetch("http://localhost:3000/api/userGetSkill", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId }),
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.status === "sukses") {
+          setSkills(parseSkillsFromString(data.user_skill || ""));
+        }
+      })
+      .catch(() => {});
+  }, [userId]);
+
+  // Simpan skills ke BE (dipanggil setiap add/remove)
+  const persistSkills = async (updated: Skill[]) => {
     setSkills(updated);
-    localStorage.setItem("tw_user_skills", JSON.stringify(updated));
+    setIsSavingSkills(true);
+    setSkillMsg(null);
+    try {
+      const res = await fetch("http://localhost:3000/api/userUISkill", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Format: "SkillName,Category,Level|SkillName,Category,Level"
+        body: JSON.stringify({ user_id: userId, user_skill: skillsToString(updated) }),
+      });
+      const result = await res.json();
+      if (res.ok && result.status === "sukses") {
+        setSkillMsg({ ok: true, text: "Skills saved!" });
+      } else {
+        setSkillMsg({ ok: false, text: result.pesan || "Failed to save skills." });
+      }
+    } catch {
+      setSkillMsg({ ok: false, text: "Cannot connect to server." });
+    } finally {
+      setIsSavingSkills(false);
+      setTimeout(() => setSkillMsg(null), 3000);
+    }
   };
 
   const addSkill = () => {
     if (!newSkillName.trim()) return;
     const category = newSkillCategory.trim() || "Other";
-    saveSkills([
-      ...skills,
-      { id: `s-${Date.now()}`, name: newSkillName.trim(), category, level: newSkillLevel },
-    ]);
-    setNewSkillName("");
-    setNewSkillCategory("");
-    setNewSkillLevel("Beginner");
+    const updated = [...skills, { id: `s-${Date.now()}`, name: newSkillName.trim(), category, level: newSkillLevel }];
+    persistSkills(updated);
+    setNewSkillName(""); setNewSkillCategory(""); setNewSkillLevel("Beginner");
     setShowAddSkill(false);
   };
 
-  const removeSkill = (id: string) => saveSkills(skills.filter(s => s.id !== id));
+  const removeSkill = (id: string) => persistSkills(skills.filter(s => s.id !== id));
 
-  // Group by category (preserving insertion order, not a fixed list)
   const categoryOrder: string[] = [];
   skills.forEach(s => { if (!categoryOrder.includes(s.category)) categoryOrder.push(s.category); });
   const skillsByCategory: Record<string, Skill[]> = {};
   categoryOrder.forEach(cat => { skillsByCategory[cat] = skills.filter(s => s.category === cat); });
 
-  // --- Learning Goals ---
-  const [learningGoals, setLearningGoals] = useState<string[]>(() => {
+  // ─── Password state ────────────────────────────────────────────────────────
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword,     setNewPassword]     = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isSavingPwd,     setIsSavingPwd]     = useState(false);
+  const [pwdMsg,          setPwdMsg]          = useState<{ ok: boolean; text: string } | null>(null);
+
+  const handleUpdatePassword = async () => {
+    setPwdMsg(null);
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setPwdMsg({ ok: false, text: "All password fields are required." }); return;
+    }
+    if (newPassword.length < 6) {
+      setPwdMsg({ ok: false, text: "New password must be at least 6 characters." }); return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwdMsg({ ok: false, text: "New password and confirmation do not match." }); return;
+    }
+    setIsSavingPwd(true);
     try {
-      const saved = localStorage.getItem("tw_learning_goals");
-      return saved ? JSON.parse(saved) : ["Learn Docker", "Improve public speaking"];
-    } catch { return []; }
-  });
-  const [newGoal, setNewGoal] = useState("");
-
-  const addGoal = () => {
-    if (!newGoal.trim()) return;
-    const updated = [...learningGoals, newGoal.trim()];
-    setLearningGoals(updated);
-    localStorage.setItem("tw_learning_goals", JSON.stringify(updated));
-    setNewGoal("");
+      const res = await fetch("http://localhost:3000/api/userUpdatePassword", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId, old_password: currentPassword, new_password: newPassword }),
+      });
+      const result = await res.json();
+      if (res.ok && result.status === "sukses") {
+        setPwdMsg({ ok: true, text: "Password updated successfully!" });
+        setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
+      } else {
+        setPwdMsg({ ok: false, text: result.pesan || "Failed to update password." });
+      }
+    } catch {
+      setPwdMsg({ ok: false, text: "Cannot connect to server." });
+    } finally {
+      setIsSavingPwd(false);
+    }
   };
 
-  const removeGoal = (idx: number) => {
-    const updated = learningGoals.filter((_, i) => i !== idx);
-    setLearningGoals(updated);
-    localStorage.setItem("tw_learning_goals", JSON.stringify(updated));
-  };
-
-  // --- Role & Work Prefs ---
-  const [preferredRole, setPreferredRole] = useState(() =>
-    localStorage.getItem("tw_preferred_role") || "Full Stack Developer"
+  // ─── Theme ─────────────────────────────────────────────────────────────────
+  const [isDark, setIsDark] = useState<boolean>(() =>
+    localStorage.getItem("tw_theme") === "dark" || document.documentElement.classList.contains("dark")
   );
+  useEffect(() => {
+    if (isDark) { document.documentElement.classList.add("dark"); localStorage.setItem("tw_theme", "dark"); }
+    else        { document.documentElement.classList.remove("dark"); localStorage.setItem("tw_theme", "light"); }
+  }, [isDark]);
 
-  const [workPrefs, setWorkPrefs] = useState<WorkPrefs>(() => {
-    try {
-      const saved = localStorage.getItem("tw_work_prefs");
-      return saved ? JSON.parse(saved) : defaultWorkPrefs;
-    } catch { return defaultWorkPrefs; }
-  });
-
-  const updateWorkPref = (key: string, value: boolean | number) => {
-    const updated = { ...workPrefs, [key]: value };
-    setWorkPrefs(updated);
-    localStorage.setItem("tw_work_prefs", JSON.stringify(updated));
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("tw_activeTeam");
+    navigate("/login");
   };
 
-  // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <div className="p-6 space-y-6">
       <div>
@@ -305,57 +301,65 @@ export function Settings() {
 
       <Tabs defaultValue="profile" className="space-y-6">
         <TabsList className="bg-muted rounded-xl">
-          <TabsTrigger value="profile"       className="rounded-lg gap-2"><User    className="w-4 h-4" />Profile</TabsTrigger>
-          <TabsTrigger value="skills"        className="rounded-lg gap-2"><Zap     className="w-4 h-4" />Skills</TabsTrigger>
-          <TabsTrigger value="appearance"    className="rounded-lg gap-2"><Palette className="w-4 h-4" />Appearance</TabsTrigger>
-          <TabsTrigger value="security"      className="rounded-lg gap-2"><Lock    className="w-4 h-4" />Security</TabsTrigger>
+          <TabsTrigger value="profile"    className="rounded-lg gap-2"><User    className="w-4 h-4" />Profile</TabsTrigger>
+          <TabsTrigger value="skills"     className="rounded-lg gap-2"><Zap     className="w-4 h-4" />Skills</TabsTrigger>
+          <TabsTrigger value="appearance" className="rounded-lg gap-2"><Palette className="w-4 h-4" />Appearance</TabsTrigger>
+          <TabsTrigger value="security"   className="rounded-lg gap-2"><Lock    className="w-4 h-4" />Security</TabsTrigger>
         </TabsList>
 
-        {/* ══════════════════════ PROFILE ══════════════════════ */}
+        {/* ── PROFILE ── */}
         <TabsContent value="profile" className="space-y-6">
           <Card className="border-border shadow-sm">
             <CardHeader>
               <CardTitle>Profile Information</CardTitle>
-              <CardDescription>Update your personal information and profile picture</CardDescription>
+              <CardDescription>Update your personal information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+
+              {/* Avatar — inisial dari full name */}
               <div className="flex items-center gap-6">
                 <Avatar className="w-20 h-20">
                   <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-cyan-500 text-white text-2xl font-bold">
                     {avatarInitials}
                   </AvatarFallback>
                 </Avatar>
-                <div className="space-y-2">
-                  <Button variant="outline" className="rounded-xl">Change Photo</Button>
-                  <p className="text-xs text-muted-foreground">JPG, PNG or GIF. Max 2MB</p>
-                </div>
               </div>
+
               <Separator />
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="firstName">First Name</Label>
-                  <Input id="firstName" value={firstName} onChange={e => setFirstName(e.target.value)} className="rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="lastName">Last Name</Label>
-                  <Input id="lastName" value={lastName} onChange={e => setLastName(e.target.value)} className="rounded-xl" />
-                </div>
+
+              {/* Full Name — satu field, bukan first/last */}
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Full Name</Label>
+                <Input id="fullName" value={fullName} onChange={e => setFullName(e.target.value)} className="rounded-xl" placeholder="e.g. Rafael Vvel" />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="rounded-xl" />
               </div>
+
               <div className="space-y-2">
                 <Label htmlFor="phone">Phone Number</Label>
                 <Input id="phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+62 81234567" className="rounded-xl" />
               </div>
-              
+
+              {/* Feedback message */}
+              {profileMsg && (
+                <p className={`text-sm font-medium ${profileMsg.ok ? "text-green-600" : "text-red-500"}`}>
+                  {profileMsg.ok ? "✓" : "⚠"} {profileMsg.text}
+                </p>
+              )}
+
               <div className="flex justify-between items-center w-full mt-4">
                 <div className="flex gap-3">
-                  <Button className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl">
-                    Save Changes
+                  <Button onClick={handleSaveProfile} disabled={isSavingProfile} className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl">
+                    {isSavingProfile ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving...</> : "Save Changes"}
                   </Button>
-                  <Button variant="outline" className="rounded-xl">Cancel</Button>
+                  <Button variant="outline" className="rounded-xl" onClick={() => {
+                    const u = getUser();
+                    setFullName(u.UserFullName || ""); setEmail(u.UserEmail || ""); setPhone(u.UserPhoneNumber || "");
+                    setProfileMsg(null);
+                  }}>Cancel</Button>
                 </div>
                 <Button onClick={handleLogout} className="bg-red-500 hover:bg-red-600 text-white rounded-xl flex items-center gap-2">
                   <LogOut className="w-4 h-4" /> Logout
@@ -365,98 +369,61 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        {/* ══════════════════════ SKILLS ══════════════════════ */}
+        {/* ── SKILLS ── */}
         <TabsContent value="skills" className="space-y-6">
-
-          {/* Skills list */}
           <Card className="border-border shadow-sm">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
-                    <Code2 className="w-5 h-5 text-indigo-600" />
+                    <Code2 className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                     My Skills
                   </CardTitle>
-                  <CardDescription>
-                    Add any skill — technical, creative, language, sports, etc.
-                  </CardDescription>
+                  <CardDescription>Add any skill — technical, creative, language, sports, etc.</CardDescription>
                 </div>
-                <Button
-                  onClick={() => setShowAddSkill(v => !v)}
-                  className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl gap-2"
-                >
-                  <Plus className="w-4 h-4" /> Add Skill
-                </Button>
+                <div className="flex items-center gap-2">
+                  {isSavingSkills && <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />}
+                  {skillMsg && <span className={`text-xs font-medium ${skillMsg.ok ? "text-green-600" : "text-red-500"}`}>{skillMsg.text}</span>}
+                  <Button onClick={() => setShowAddSkill(v => !v)} className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl gap-2">
+                    <Plus className="w-4 h-4" /> Add Skill
+                  </Button>
+                </div>
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
 
-              {/* Add skill inline form */}
               {showAddSkill && (
-                <div className="p-4 rounded-xl border border-indigo-200 bg-indigo-50/60 space-y-3">
+                <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/60 dark:bg-indigo-950/20 space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="font-medium text-sm text-indigo-900">New Skill</p>
-                    <button onClick={() => setShowAddSkill(false)} className="text-slate-400 hover:text-slate-600">
-                      <X className="w-4 h-4" />
-                    </button>
+                    <p className="font-medium text-sm text-indigo-900 dark:text-indigo-200">New Skill</p>
+                    <button onClick={() => setShowAddSkill(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X className="w-4 h-4" /></button>
                   </div>
-
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* Skill name — free text */}
                     <div className="space-y-1">
                       <Label className="text-xs">Skill Name</Label>
-                      <Input
-                        value={newSkillName}
-                        onChange={e => setNewSkillName(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && addSkill()}
-                        placeholder="e.g. Photography, Python, Guitar…"
-                        className="rounded-lg h-9"
-                        autoFocus
-                      />
+                      <Input value={newSkillName} onChange={e => setNewSkillName(e.target.value)} onKeyDown={e => e.key === "Enter" && addSkill()} placeholder="e.g. Photography, Python, Guitar…" className="rounded-lg h-9" autoFocus />
                     </div>
-
-                    {/* Category — combobox (type anything OR pick suggestion) */}
                     <div className="space-y-1">
-                      <Label className="text-xs">
-                        Category
-                        <span className="ml-1 text-muted-foreground font-normal">(can be custom)</span>
-                      </Label>
+                      <Label className="text-xs">Category</Label>
                       <CategoryCombobox value={newSkillCategory} onChange={setNewSkillCategory} />
                     </div>
-
-                    {/* Proficiency */}
                     <div className="space-y-1">
                       <Label className="text-xs">Proficiency Level</Label>
                       <div className="flex gap-1 flex-wrap">
                         {PROFICIENCY_LEVELS.map(l => (
-                          <button
-                            key={l}
-                            type="button"
-                            onClick={() => setNewSkillLevel(l)}
-                            className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
-                              newSkillLevel === l
-                                ? `${PROFICIENCY_COLORS[l]} border-current font-semibold ring-2 ring-indigo-300`
-                                : "bg-white border-border text-muted-foreground hover:border-indigo-300"
-                            }`}
-                          >
-                            {l}
-                          </button>
+                          <button key={l} type="button" onClick={() => setNewSkillLevel(l)}
+                            className={`text-xs px-2.5 py-1 rounded-full border transition-all ${newSkillLevel === l ? `${PROFICIENCY_COLORS[l]} border-current font-semibold ring-2 ring-indigo-300 dark:ring-indigo-800` : "bg-background border-border text-muted-foreground hover:border-indigo-300 dark:hover:border-indigo-800"}`}
+                          >{l}</button>
                         ))}
                       </div>
                     </div>
                   </div>
-
-                  <Button
-                    onClick={addSkill}
-                    disabled={!newSkillName.trim()}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg gap-2 h-9"
-                  >
+                  <Button onClick={addSkill} disabled={!newSkillName.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg gap-2 h-9">
                     <Check className="w-4 h-4" /> Confirm
                   </Button>
                 </div>
               )}
 
-              {/* Skills grouped by category */}
               {Object.keys(skillsByCategory).length === 0 ? (
                 <div className="text-center py-10 text-muted-foreground">
                   <Zap className="w-10 h-10 mx-auto mb-3 opacity-25" />
@@ -466,25 +433,13 @@ export function Settings() {
                 <div className="space-y-5">
                   {Object.entries(skillsByCategory).map(([category, catSkills]) => (
                     <div key={category}>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">
-                        {category}
-                      </p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest mb-2">{category}</p>
                       <div className="flex flex-wrap gap-2">
                         {catSkills.map(skill => (
-                          <div
-                            key={skill.id}
-                            className={`flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full border text-sm font-medium ${getCategoryColor(skill.category)}`}
-                          >
+                          <div key={skill.id} className={`flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full border text-sm font-medium ${getCategoryColor(skill.category)}`}>
                             <span>{skill.name}</span>
-                            <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-normal ${PROFICIENCY_COLORS[skill.level] ?? "bg-slate-100 text-slate-600"}`}>
-                              {skill.level}
-                            </span>
-                            <button
-                              onClick={() => removeSkill(skill.id)}
-                              className="ml-0.5 opacity-50 hover:opacity-100 transition-opacity"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
+                            <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-normal ${PROFICIENCY_COLORS[skill.level] ?? "bg-slate-100 dark:bg-slate-800 text-slate-600"}`}>{skill.level}</span>
+                            <button onClick={() => removeSkill(skill.id)} className="ml-0.5 opacity-50 hover:opacity-100 transition-opacity"><X className="w-3 h-3" /></button>
                           </div>
                         ))}
                       </div>
@@ -494,37 +449,10 @@ export function Settings() {
               )}
             </CardContent>
           </Card>
-
-          {/* Skill Visibility */}
-          <Card className="border-border shadow-sm">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Globe className="w-5 h-5 text-indigo-600" />
-                Skill Visibility
-              </CardTitle>
-              <CardDescription>Control what your teammates can see</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              {[
-                { label: "Show skills to team members", desc: "Team members can view your full skill profile",                                      defaultOn: true },
-                { label: "Show proficiency levels",      desc: "Display proficiency levels alongside skill names",                                 defaultOn: true },
-              ].map((item, idx, arr) => (
-                <div key={item.label}>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label>{item.label}</Label>
-                      <p className="text-sm text-muted-foreground">{item.desc}</p>
-                    </div>
-                    <Switch defaultChecked={item.defaultOn} />
-                  </div>
-                  {idx < arr.length - 1 && <Separator className="mt-5" />}
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          {/* Skill Visibility card dihapus sesuai permintaan */}
         </TabsContent>
 
-        {/* ══════════════════════ APPEARANCE ══════════════════════ */}
+        {/* ── APPEARANCE ── */}
         <TabsContent value="appearance" className="space-y-6">
           <Card className="border-border shadow-sm">
             <CardHeader>
@@ -536,35 +464,17 @@ export function Settings() {
                 <Label>Theme</Label>
                 <p className="text-sm text-muted-foreground">Choose your preferred color theme</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => setIsDark(false)}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${
-                      !isDark ? "border-indigo-500 bg-gradient-to-r from-indigo-50 to-cyan-50" : "border-border hover:border-indigo-200"
-                    }`}
-                  >
+                  <button onClick={() => setIsDark(false)} className={`p-4 rounded-xl border-2 transition-all text-left ${!isDark ? "border-indigo-500 bg-gradient-to-r from-indigo-50/50 to-cyan-50/50 dark:from-indigo-950/20 dark:to-cyan-950/20" : "border-border hover:border-indigo-200"}`}>
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 shadow-sm" />
-                      <div className="flex-1">
-                        <p className="font-medium text-sm">Light</p>
-                        <p className="text-xs text-muted-foreground">{!isDark ? "Active" : "Click to apply"}</p>
-                      </div>
+                      <div className="flex-1"><p className="font-medium text-sm text-foreground">Light</p><p className="text-xs text-muted-foreground">{!isDark ? "Active" : "Click to apply"}</p></div>
                       {!isDark && <Check className="w-4 h-4 text-indigo-600" />}
                     </div>
                   </button>
-                  <button
-                    onClick={() => setIsDark(true)}
-                    className={`p-4 rounded-xl border-2 transition-all text-left ${
-                      isDark ? "border-indigo-500 bg-slate-800" : "border-border hover:border-slate-400"
-                    }`}
-                  >
+                  <button onClick={() => setIsDark(true)} className={`p-4 rounded-xl border-2 transition-all text-left ${isDark ? "border-indigo-500 bg-slate-900" : "border-border hover:border-slate-400"}`}>
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-slate-700 border border-slate-600" />
-                      <div className="flex-1">
-                        <p className={`font-medium text-sm ${isDark ? "text-slate-100" : ""}`}>Dark</p>
-                        <p className={`text-xs ${isDark ? "text-slate-400" : "text-muted-foreground"}`}>
-                          {isDark ? "Active" : "Click to apply"}
-                        </p>
-                      </div>
+                      <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700" />
+                      <div className="flex-1"><p className="font-medium text-sm text-foreground">Dark</p><p className="text-xs text-muted-foreground">{isDark ? "Active" : "Click to apply"}</p></div>
                       {isDark && <Check className="w-4 h-4 text-indigo-400" />}
                     </div>
                   </button>
@@ -574,28 +484,35 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        {/* ══════════════════════ SECURITY ══════════════════════ */}
+        {/* ── SECURITY ── */}
         <TabsContent value="security" className="space-y-6">
           <Card className="border-border shadow-sm">
             <CardHeader>
               <CardTitle>Security Settings</CardTitle>
-              <CardDescription>Manage your account security and privacy</CardDescription>
+              <CardDescription>Manage your account security</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
                 <Label htmlFor="currentPassword">Current Password</Label>
-                <Input id="currentPassword" type="password" className="rounded-xl" />
+                <Input id="currentPassword" type="password" className="rounded-xl" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} placeholder="Enter your current password" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="newPassword">New Password</Label>
-                <Input id="newPassword" type="password" className="rounded-xl" />
+                <Input id="newPassword" type="password" className="rounded-xl" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Minimum 6 characters" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                <Input id="confirmPassword" type="password" className="rounded-xl" />
+                <Input id="confirmPassword" type="password" className="rounded-xl" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Repeat new password" />
               </div>
-              <Button className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl">
-                Update Password
+
+              {pwdMsg && (
+                <p className={`text-sm font-medium ${pwdMsg.ok ? "text-green-600" : "text-red-500"}`}>
+                  {pwdMsg.ok ? "✓" : "⚠"} {pwdMsg.text}
+                </p>
+              )}
+
+              <Button onClick={handleUpdatePassword} disabled={isSavingPwd} className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl">
+                {isSavingPwd ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Updating...</> : "Update Password"}
               </Button>
             </CardContent>
           </Card>

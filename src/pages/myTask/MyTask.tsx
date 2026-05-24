@@ -9,13 +9,11 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
-import { Checkbox } from "../../components/ui/checkbox";
 import { Label } from "../../components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { format } from "date-fns";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
 interface SubTask {
   id: string;
   title: string;
@@ -50,11 +48,9 @@ interface MyTask {
   category: string;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
 const TASKS_KEY = "tw_tasks";
-const CURRENT_USER = "Rafael"; // Sesuaikan dengan nama user yang login nanti
+const CURRENT_USER = "Rafael";
 
-// ─── Utilities ────────────────────────────────────────────────────────────────
 function difficultyToPriority(d: string): MyTask["priority"] {
   if (d === "expert" || d === "hard") return "high";
   if (d === "medium") return "medium";
@@ -76,26 +72,23 @@ function saveAllTasks(tasks: Task[]) {
 function buildMyTasks(allTasks: Task[]): MyTask[] {
   const result: MyTask[] = [];
   allTasks.forEach((task) => {
-    task.subtasks
-      // Saat ini difilter berdasarkan CURRENT_USER. Bisa di-adjust nanti
-      .forEach((sub) => {
-        result.push({
-          id: sub.id,
-          taskId: task.id,
-          title: sub.title,
-          bigTaskTitle: task.title,
-          team: task.team,
-          deadline: task.dueDate,
-          priority: difficultyToPriority(task.difficulty),
-          status: sub.status,
-          category: task.tags[0] ?? task.difficulty,
-        });
+    task.subtasks.forEach((sub) => {
+      result.push({
+        id: sub.id,
+        taskId: task.id,
+        title: sub.title,
+        bigTaskTitle: task.title,
+        team: task.team,
+        deadline: task.dueDate,
+        priority: difficultyToPriority(task.difficulty),
+        status: sub.status,
+        category: task.tags[0] ?? task.difficulty,
       });
+    });
   });
   return result;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
 export function MyTasks() {
   const { activeTeam } = useOutletContext<{ activeTeam: string }>();
 
@@ -137,13 +130,11 @@ export function MyTasks() {
     setMyTasks(buildMyTasks(updated).filter((mt) => mt.team === activeTeam));
   };
 
-  // ── Submit dialog States ──────────────────────────────────────────────────
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [submittingTask, setSubmittingTask] = useState<MyTask | null>(null);
   const [submissionLink, setSubmissionLink] = useState("");
   const [submissionFile, setSubmissionFile] = useState<string | null>(null);
   const [submissionFileSize, setSubmissionFileSize] = useState<string>("0 KB");
-  // Default di-set ke Document agar rapi
   const [submissionCategory, setSubmissionCategory] = useState("document"); 
   const [activeTab, setActiveTab] = useState("link");
 
@@ -151,7 +142,7 @@ export function MyTasks() {
     setSubmittingTask(task);
     setSubmissionLink("");
     setSubmissionFile(null);
-    setSubmissionCategory("document"); // Reset default
+    setSubmissionCategory("document");
     setSubmitDialogOpen(true);
   };
 
@@ -159,7 +150,6 @@ export function MyTasks() {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
       setSubmissionFile(file.name);
-      // Kalkulasi size
       if (file.size > 1024 * 1024) {
         setSubmissionFileSize((file.size / (1024 * 1024)).toFixed(1) + " MB");
       } else {
@@ -171,7 +161,6 @@ export function MyTasks() {
   const confirmSubmit = () => {
     if (!submittingTask) return;
 
-    // --- INTEGRASI KE HALAMAN FILES ---
     const storedFiles = localStorage.getItem("tw_files");
     const currentFiles = storedFiles ? JSON.parse(storedFiles) : [];
 
@@ -186,7 +175,6 @@ export function MyTasks() {
     } else {
       fileName = submissionFile || "unknown-file";
       fileSize = submissionFileSize;
-      // Cek tipe file dari extension untuk icon di Files
       const ext = fileName.split('.').pop()?.toLowerCase();
       if (['png', 'jpg', 'jpeg', 'gif', 'svg'].includes(ext || '')) fileType = 'image';
       else if (['fig', 'sketch'].includes(ext || '')) fileType = 'design';
@@ -196,40 +184,38 @@ export function MyTasks() {
     const newFile = {
       id: Date.now(),
       name: fileName,
-      type: fileType, // type ini untuk nampilin warna icon di Files
+      type: fileType,
       size: fileSize,
       owner: CURRENT_USER,
       avatar: CURRENT_USER,
       uploadDate: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
       status: "final",
-      category: submissionCategory // Kategori dari dropdown (design, document, code, other)
+      category: submissionCategory
     };
 
     currentFiles.unshift(newFile); 
     localStorage.setItem("tw_files", JSON.stringify(currentFiles));
     
     window.dispatchEvent(new Event("storage"));
-    // -----------------------------------
 
     updateSubtaskStatus(submittingTask.taskId, submittingTask.id, "completed");
     setSubmitDialogOpen(false);
     setSubmittingTask(null);
   };
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
   const getPriorityColor = (p: string) => {
     const m: Record<string, string> = {
-      high: "bg-red-50 text-red-700 border-red-200",
-      medium: "bg-yellow-50 text-yellow-700 border-yellow-200",
-      low: "bg-blue-50 text-blue-700 border-blue-200",
+      high: "bg-red-500/10 text-red-500 border-red-500/20",
+      medium: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+      low: "bg-blue-500/10 text-blue-500 border-blue-500/20",
     };
     return m[p] ?? "";
   };
 
   const getStatusIcon = (s: string) => {
-    if (s === "completed") return <CheckCircle2 className="w-5 h-5 text-green-600" />;
-    if (s === "in-progress") return <Clock className="w-5 h-5 text-blue-600" />;
-    return <Circle className="w-5 h-5 text-muted-foreground" />;
+    if (s === "completed") return <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" />;
+    if (s === "in-progress") return <Clock className="w-5 h-5 text-blue-500 shrink-0" />;
+    return <Circle className="w-5 h-5 text-muted-foreground shrink-0" />;
   };
 
   const filtered = (status?: string) => {
@@ -238,25 +224,24 @@ export function MyTasks() {
     return list;
   };
 
-  // ── Stats ─────────────────────────────────────────────────────────────────
   const total = myTasks.length;
   const inProgress = myTasks.filter((t) => t.status === "in-progress").length;
   const completed = myTasks.filter((t) => t.status === "completed").length;
   const highPriority = myTasks.filter((t) => t.priority === "high" && t.status !== "completed").length;
 
   const TaskCard = ({ task, showActions = true }: { task: MyTask; showActions?: boolean }) => (
-    <Card className={`border-border bg-white shadow-sm hover:shadow-md transition-shadow ${task.status === "completed" ? "opacity-60" : ""}`}>
+    <Card className={`border-border bg-card shadow-sm hover:shadow-md transition-shadow ${task.status === "completed" ? "opacity-60" : ""}`}>
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           {getStatusIcon(task.status)}
           <div className="flex-1 space-y-2">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className={`font-medium ${task.status === "completed" ? "line-through text-muted-foreground" : ""}`}>
+                <h3 className={`font-medium ${task.status === "completed" ? "line-through text-muted-foreground" : "text-foreground"}`}>
                   {task.title}
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  From: <span className="font-medium text-indigo-600">{task.bigTaskTitle}</span> · {task.team}
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  From: <span className="font-medium text-indigo-500 dark:text-indigo-400">{task.bigTaskTitle}</span> · {task.team}
                 </p>
               </div>
               <Badge variant="outline" className={getPriorityColor(task.priority)}>{task.priority}</Badge>
@@ -267,7 +252,7 @@ export function MyTasks() {
                 <Flag className="w-4 h-4" />
                 {format(new Date(task.deadline), "MMM dd, yyyy")}
               </span>
-              <Badge variant="secondary" className="text-xs bg-slate-100 capitalize">{task.category}</Badge>
+              <Badge variant="secondary" className="text-xs bg-muted capitalize text-muted-foreground">{task.category}</Badge>
             </div>
 
             {showActions && task.status !== "completed" && (
@@ -293,13 +278,13 @@ export function MyTasks() {
   );
 
   const NoTasksState = () => (
-    <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-slate-200 rounded-2xl">
-      <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center mb-4">
-        <Inbox className="w-7 h-7 text-indigo-400" />
+    <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-border rounded-2xl bg-card">
+      <div className="w-14 h-14 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4">
+        <Inbox className="w-7 h-7 text-indigo-500" />
       </div>
-      <h3 className="font-semibold text-xl text-slate-900 mb-1">No tasks assigned yet</h3>
-      <p className="text-sm text-slate-500 text-center max-w-xs">
-        Sub-tasks assigned to you via <span className="font-medium text-indigo-600">AI Breakdown</span> in Task Management will appear here.
+      <h3 className="font-semibold text-xl text-foreground mb-1">No tasks assigned yet</h3>
+      <p className="text-sm text-muted-foreground text-center max-w-xs">
+        Sub-tasks assigned to you via <span className="font-medium text-indigo-500">AI Breakdown</span> in Task Management will appear here.
       </p>
     </div>
   );
@@ -309,32 +294,32 @@ export function MyTasks() {
       <div>
         <h1 className="text-3xl font-semibold text-foreground mb-1">My Tasks</h1>
         <p className="text-muted-foreground">
-          Sub-tasks assigned to you in <span className="font-semibold text-blue-600">{activeTeam}</span>
+          Sub-tasks assigned to you in <span className="font-semibold text-blue-500">{activeTeam}</span>
         </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-border shadow-sm">
+        <Card className="border-border shadow-sm bg-card">
           <CardContent className="p-4 text-center">
             <p className="text-2xl font-semibold text-foreground">{total}</p>
             <p className="text-sm text-muted-foreground">Total Tasks</p>
           </CardContent>
         </Card>
-        <Card className="border-border shadow-sm">
+        <Card className="border-border shadow-sm bg-card">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-semibold text-blue-600">{inProgress}</p>
+            <p className="text-2xl font-semibold text-blue-500">{inProgress}</p>
             <p className="text-sm text-muted-foreground">In Progress</p>
           </CardContent>
         </Card>
-        <Card className="border-border shadow-sm">
+        <Card className="border-border shadow-sm bg-card">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-semibold text-green-600">{completed}</p>
+            <p className="text-2xl font-semibold text-green-500">{completed}</p>
             <p className="text-sm text-muted-foreground">Completed</p>
           </CardContent>
         </Card>
-        <Card className="border-border shadow-sm">
+        <Card className="border-border shadow-sm bg-card">
           <CardContent className="p-4 text-center">
-            <p className="text-2xl font-semibold text-red-600">{highPriority}</p>
+            <p className="text-2xl font-semibold text-red-500">{highPriority}</p>
             <p className="text-sm text-muted-foreground">High Priority</p>
           </CardContent>
         </Card>
@@ -345,7 +330,7 @@ export function MyTasks() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search your tasks..."
-            className="pl-10 rounded-xl bg-white"
+            className="pl-10 rounded-xl bg-card text-foreground border-border"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -356,7 +341,7 @@ export function MyTasks() {
         <NoTasksState />
       ) : (
         <Tabs defaultValue="all" className="space-y-4">
-          <TabsList className="bg-slate-100/50 rounded-xl p-1">
+          <TabsList className="bg-muted rounded-xl p-1 border border-border">
             <TabsTrigger value="all" className="rounded-lg">All ({total})</TabsTrigger>
             <TabsTrigger value="todo" className="rounded-lg">To Do ({myTasks.filter(t=>t.status==="todo").length})</TabsTrigger>
             <TabsTrigger value="in-progress" className="rounded-lg">In Progress ({inProgress})</TabsTrigger>
@@ -364,44 +349,43 @@ export function MyTasks() {
           </TabsList>
 
           <TabsContent value="all" className="space-y-3">
-            {filtered().length === 0 ? <p className="text-center text-slate-400 py-8">No tasks match your search.</p> : filtered().map((t) => <TaskCard key={t.id} task={t} />)}
+            {filtered().length === 0 ? <p className="text-center text-muted-foreground py-8">No tasks match your search.</p> : filtered().map((t) => <TaskCard key={t.id} task={t} />)}
           </TabsContent>
           <TabsContent value="todo" className="space-y-3">
-            {filtered("todo").length === 0 ? <p className="text-center text-slate-400 py-8">No to-do tasks.</p> : filtered("todo").map((t) => <TaskCard key={t.id} task={t} />)}
+            {filtered("todo").length === 0 ? <p className="text-center text-muted-foreground py-8">No to-do tasks.</p> : filtered("todo").map((t) => <TaskCard key={t.id} task={t} />)}
           </TabsContent>
           <TabsContent value="in-progress" className="space-y-3">
-            {filtered("in-progress").length === 0 ? <p className="text-center text-slate-400 py-8">No in-progress tasks.</p> : filtered("in-progress").map((t) => <TaskCard key={t.id} task={t} />)}
+            {filtered("in-progress").length === 0 ? <p className="text-center text-muted-foreground py-8">No in-progress tasks.</p> : filtered("in-progress").map((t) => <TaskCard key={t.id} task={t} />)}
           </TabsContent>
           <TabsContent value="completed" className="space-y-3">
-            {filtered("completed").length === 0 ? <p className="text-center text-slate-400 py-8">No completed tasks yet.</p> : filtered("completed").map((t) => <TaskCard key={t.id} task={t} showActions={false} />)}
+            {filtered("completed").length === 0 ? <p className="text-center text-muted-foreground py-8">No completed tasks yet.</p> : filtered("completed").map((t) => <TaskCard key={t.id} task={t} showActions={false} />)}
           </TabsContent>
         </Tabs>
       )}
 
-      {/* Submit Work Dialog */}
       <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
-        <DialogContent className="rounded-2xl bg-white sm:max-w-md">
+        <DialogContent className="rounded-2xl bg-card border border-border sm:max-w-md text-foreground">
           <DialogHeader>
             <DialogTitle>Submit Your Work</DialogTitle>
-            <DialogDescription>
-              Attach a link or upload a file to mark <span className="font-semibold text-slate-700">"{submittingTask?.title}"</span> as completed.
+            <DialogDescription className="text-muted-foreground">
+              Attach a link or upload a file to mark <span className="font-semibold text-foreground">"{submittingTask?.title}"</span> as completed.
             </DialogDescription>
           </DialogHeader>
 
           <Tabs defaultValue="link" className="w-full mt-2" onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 bg-slate-100 rounded-xl mb-4">
+            <TabsList className="grid w-full grid-cols-2 bg-muted rounded-xl mb-4 border border-border">
               <TabsTrigger value="link" className="rounded-lg">Link URL</TabsTrigger>
               <TabsTrigger value="file" className="rounded-lg">Upload File</TabsTrigger>
             </TabsList>
 
             <TabsContent value="link" className="space-y-4 py-2">
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-slate-700">Submission URL</Label>
+                <Label className="text-sm font-semibold text-foreground">Submission URL</Label>
                 <div className="relative">
-                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
                     placeholder="e.g. https://github.com/..."
-                    className="rounded-xl pl-9 bg-slate-50"
+                    className="rounded-xl pl-9 bg-background border-border text-foreground"
                     value={submissionLink}
                     onChange={(e) => setSubmissionLink(e.target.value)}
                   />
@@ -411,26 +395,26 @@ export function MyTasks() {
 
             <TabsContent value="file" className="space-y-4 py-2">
               <div className="space-y-2">
-                <Label className="text-sm font-semibold text-slate-700">Document File</Label>
+                <Label className="text-sm font-semibold text-foreground">Document File</Label>
                 {!submissionFile ? (
-                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 border-dashed rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
-                    <UploadCloud className="w-8 h-8 text-slate-400 mb-2" />
-                    <p className="text-sm text-slate-500"><span className="font-semibold text-blue-600">Click to upload</span> or drag and drop</p>
-                    <p className="text-xs text-slate-400 mt-1">PDF, DOCX, ZIP, PNG dll</p>
+                  <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-xl cursor-pointer bg-background hover:bg-muted transition-colors">
+                    <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
+                    <p className="text-sm text-muted-foreground"><span className="font-semibold text-indigo-500">Click to upload</span> or drag and drop</p>
+                    <p className="text-xs text-muted-foreground mt-1">PDF, DOCX, ZIP, PNG dll</p>
                     <input type="file" className="hidden" onChange={handleFileUpload} />
                   </label>
                 ) : (
-                  <div className="flex items-center justify-between p-3 border border-slate-200 rounded-xl bg-slate-50">
+                  <div className="flex items-center justify-between p-3 border border-border rounded-xl bg-background">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-lg flex items-center justify-center">
+                      <div className="w-10 h-10 bg-indigo-500/10 text-indigo-500 rounded-lg flex items-center justify-center">
                         <FileText className="w-5 h-5" />
                       </div>
                       <div>
-                        <span className="text-sm font-medium text-slate-700 max-w-[200px] truncate block">{submissionFile}</span>
-                        <span className="text-xs text-green-600 font-medium">Ready to submit ({submissionFileSize})</span>
+                        <span className="text-sm font-medium text-foreground max-w-[200px] truncate block">{submissionFile}</span>
+                        <span className="text-xs text-green-500 font-medium">Ready to submit ({submissionFileSize})</span>
                       </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => setSubmissionFile(null)} className="text-slate-400 hover:text-red-500">
+                    <Button variant="ghost" size="icon" onClick={() => setSubmissionFile(null)} className="text-muted-foreground hover:text-red-500">
                       <X className="w-4 h-4" />
                     </Button>
                   </div>
@@ -439,11 +423,10 @@ export function MyTasks() {
             </TabsContent>
           </Tabs>
 
-          {/* DITAMBAHKAN: Dropdown Kategori (Sesuai Permintaan) */}
           <div className="space-y-2 mt-2">
-            <Label className="text-sm font-semibold text-slate-700">Category</Label>
+            <Label className="text-sm font-semibold text-foreground">Category</Label>
             <select
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
               value={submissionCategory}
               onChange={(e) => setSubmissionCategory(e.target.value)}
             >

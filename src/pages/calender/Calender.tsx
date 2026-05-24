@@ -6,35 +6,27 @@ import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 
-// Interface menyesuaikan dengan struktur Task di Dashboard
 interface SubTask { id: string; title: string; assignedTo: string; avatarSeed: string; status: string; }
 interface Task { id: string; team: string; title: string; difficulty: string; dueDate: string; assignedTo: string | null; status: string; subtasks: SubTask[]; }
 
 export function Calendar() {
   const { activeTeam } = useOutletContext<{ activeTeam: string }>();
   const [allTasks, setAllTasks] = useState<Task[]>([]);
-  
-  // State untuk navigasi tanggal
   const [baseDate, setBaseDate] = useState(new Date());
-  // State untuk toggle Month/Week view (baru tampilan dasar)
   const [view, setView] = useState<"week" | "month">("week");
 
-  // Ambil data task dari LocalStorage
   useEffect(() => {
     const fetchTasks = () => {
       const stored = localStorage.getItem("tw_tasks");
       if (stored) setAllTasks(JSON.parse(stored));
     };
     fetchTasks();
-    
     window.addEventListener("storage", fetchTasks);
     return () => window.removeEventListener("storage", fetchTasks);
   }, []);
 
-  // Filter task khusus untuk tim yang sedang aktif
   const teamTasks = allTasks.filter(t => t.team === activeTeam);
 
-  // FUNGSI NAVIGASI TANGGAL
   const handlePrevWeek = () => {
     const newDate = new Date(baseDate);
     newDate.setDate(newDate.getDate() - 7);
@@ -49,28 +41,25 @@ export function Calendar() {
 
   const goToToday = () => setBaseDate(new Date());
 
-  // Helper untuk membuat daftar hari dalam 1 minggu berdasarkan baseDate
   const getWeekDays = (date: Date) => {
     const current = new Date(date);
     const day = current.getDay();
-    const diff = current.getDate() - day + (day === 0 ? -6 : 1); // Geser ke hari Senin
+    const diff = current.getDate() - day + (day === 0 ? -6 : 1);
     const monday = new Date(current.setDate(diff));
     
     const week = [];
     const todayStr = new Date().toDateString();
 
     for (let i = 0; i < 7; i++) {
-     const nextDate = new Date(monday);
+      const nextDate = new Date(monday);
       nextDate.setDate(monday.getDate() + i);
       
-      // Format YYYY-MM-DD yang kebal dari bug zona waktu (waktu lokal)
       const yyyy = nextDate.getFullYear();
       const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
       const dd = String(nextDate.getDate()).padStart(2, '0');
       const dateStr = `${yyyy}-${mm}-${dd}`;
       
-      // Cari task yang due date-nya jatuh pada hari ini
-     const dayTasks = teamTasks.filter(t => t.dueDate.startsWith(dateStr));
+      const dayTasks = teamTasks.filter(t => t.dueDate.startsWith(dateStr));
 
       week.push({
         date: nextDate.getDate(),
@@ -80,9 +69,9 @@ export function Calendar() {
         tasks: dayTasks.map(t => ({
           id: t.id,
           title: t.title,
-          time: "11:59 PM", // Default deadline time
+          time: "11:59 PM",
           member: t.assignedTo || "Unassigned",
-          color: t.status === "completed" ? "bg-green-500" : "bg-indigo-500"
+          color: t.status === "completed" ? "bg-green-600 dark:bg-green-700" : "bg-indigo-600 dark:bg-indigo-700"
         }))
       });
     }
@@ -90,38 +79,33 @@ export function Calendar() {
   };
 
   const currentWeekDays = getWeekDays(baseDate);
-  
-  // Format judul bulan (e.g., "February 2026")
   const currentMonthLabel = baseDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  
-  // Header teks untuk rentang minggu
   const weekStart = currentWeekDays[0].date;
   const weekEnd = currentWeekDays[6].date;
   const weekMonth = baseDate.toLocaleDateString("en-US", { month: "short" });
 
-  // MENGHITUNG UPCOMING EVENTS (Task yang belum selesai & deadline >= hari ini)
   const todayISO = new Date().toISOString().split('T')[0];
   const upcomingTasks = teamTasks
     .filter(t => t.status !== "completed" && t.dueDate >= todayISO)
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-    .slice(0, 5); // Ambil 5 terdekat
+    .slice(0, 5);
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-foreground mb-1">Calendar</h1>
-          <p className="text-muted-foreground">Manage deadlines for <span className="font-semibold text-indigo-600">{activeTeam}</span></p>
+          <p className="text-muted-foreground">Manage deadlines for <span className="font-semibold text-indigo-500 dark:text-indigo-400">{activeTeam}</span></p>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={goToToday} className="rounded-xl mr-2 text-indigo-600 border-indigo-200 hover:bg-indigo-50">
+          <Button variant="outline" onClick={goToToday} className="rounded-xl mr-2 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900 hover:bg-indigo-50 dark:hover:bg-indigo-950">
             Today
           </Button>
           <Button variant="outline" size="icon" className="rounded-xl" onClick={handlePrevWeek}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
-          <div className="px-4 py-2 bg-white border border-border rounded-xl min-w-[160px] text-center shadow-sm">
-            <p className="font-medium text-slate-800">{currentMonthLabel}</p>
+          <div className="px-4 py-2 bg-card border border-border rounded-xl min-w-[160px] text-center shadow-sm">
+            <p className="font-medium text-foreground">{currentMonthLabel}</p>
           </div>
           <Button variant="outline" size="icon" className="rounded-xl" onClick={handleNextWeek}>
             <ChevronRight className="w-4 h-4" />
@@ -130,8 +114,7 @@ export function Calendar() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Weekly Calendar View */}
-        <Card className="lg:col-span-2 border-border shadow-sm bg-white">
+        <Card className="lg:col-span-2 border-border shadow-sm bg-card">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
@@ -156,16 +139,16 @@ export function Calendar() {
                     key={idx} 
                     className={`p-3 rounded-xl border ${
                       day.isToday 
-                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50 to-cyan-50 ring-1 ring-indigo-200' 
-                        : 'border-slate-200 bg-slate-50'
+                        ? 'border-indigo-500 bg-gradient-to-br from-indigo-50/50 to-cyan-50/50 dark:from-indigo-950/30 dark:to-cyan-950/30 ring-1 ring-indigo-200 dark:ring-indigo-800' 
+                        : 'border-border bg-muted/40'
                     } hover:shadow-md transition-all min-h-[140px] flex flex-col`}
                   >
                     <div className="text-center mb-3">
-                      <p className="text-xs text-slate-500 font-medium mb-1">{day.day}</p>
+                      <p className="text-xs text-muted-foreground font-medium mb-1">{day.day}</p>
                       <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
                         day.isToday 
                           ? 'bg-indigo-600 text-white font-bold shadow-sm' 
-                          : 'text-slate-700 font-semibold'
+                          : 'text-foreground font-semibold'
                       }`}>
                         {day.date}
                       </div>
@@ -185,62 +168,59 @@ export function Calendar() {
                 ))}
               </div>
             ) : (
-              <div className="py-10 text-center border-2 border-dashed border-slate-200 rounded-xl">
-                <CalendarIcon className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-                {/* <p className="text-slate-500 font-medium">Month View is under construction</p>
-                <p className="text-sm text-slate-400">Silakan request desain grid 30 hari jika diperlukan!</p> */}
+              <div className="py-10 text-center border-2 border-dashed border-border rounded-xl">
+                <CalendarIcon className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
               </div>
             )}
           </CardContent>
         </Card>
 
-        {/* Upcoming Events */}
-        <Card className="border-border shadow-sm bg-white">
+        <Card className="border-border shadow-sm bg-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
-              <Clock className="w-5 h-5 text-indigo-600" />
+              <Clock className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
               Upcoming Deadlines
             </CardTitle>
             <CardDescription>Pending tasks closest to deadline</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {upcomingTasks.length > 0 ? upcomingTasks.map((event) => (
-              <div key={event.id} className="p-3 rounded-xl border border-slate-100 bg-slate-50 hover:border-indigo-100 transition-colors">
+              <div key={event.id} className="p-3 rounded-xl border border-border bg-muted/30 hover:border-indigo-500/50 transition-colors">
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <h4 className="font-medium text-sm text-slate-800 flex-1 leading-snug">{event.title}</h4>
+                    <h4 className="font-medium text-sm text-foreground flex-1 leading-snug">{event.title}</h4>
                     <Badge 
                       variant="outline"
                       className={`text-[10px] ${
-                        event.difficulty === "expert" || event.difficulty === "hard" ? "bg-red-50 text-red-600 border-red-200" :
-                        event.difficulty === "medium" ? "bg-amber-50 text-amber-600 border-amber-200" :
-                        "bg-green-50 text-green-600 border-green-200"
+                        event.difficulty === "expert" || event.difficulty === "hard" ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                        event.difficulty === "medium" ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
+                        "bg-green-500/10 text-green-500 border-green-500/20"
                       }`}
                     >
                       {event.difficulty}
                     </Badge>
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <CalendarIcon className="w-3 h-3 text-indigo-400" />
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <CalendarIcon className="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
                     <span>{new Date(event.dueDate).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</span>
                   </div>
                   <div className="flex items-center gap-2 pt-1">
-                    <Avatar className="w-5 h-5 border border-white shadow-sm">
-                      <AvatarFallback className="text-[9px] bg-indigo-100 text-indigo-700 font-bold">
+                    <Avatar className="w-5 h-5 border border-background shadow-sm">
+                      <AvatarFallback className="text-[9px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold">
                         {(event.assignedTo || "Unassigned").charAt(0)}
                       </AvatarFallback>
                     </Avatar>
-                    <span className="text-[11px] font-medium text-slate-600">{event.assignedTo || "Unassigned"}</span>
+                    <span className="text-[11px] font-medium text-muted-foreground">{event.assignedTo || "Unassigned"}</span>
                   </div>
                 </div>
               </div>
             )) : (
               <div className="text-center py-8">
-                <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-2">
+                <div className="w-12 h-12 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-2">
                   <Clock className="w-6 h-6 text-green-500" />
                 </div>
-                <p className="text-sm font-medium text-slate-700">Clear Schedule!</p>
-                <p className="text-xs text-slate-500 mt-1">No upcoming deadlines for {activeTeam}.</p>
+                <p className="text-sm font-medium text-foreground">Clear Schedule!</p>
+                <p className="text-xs text-muted-foreground mt-1">No upcoming deadlines for {activeTeam}.</p>
               </div>
             )}
           </CardContent>
