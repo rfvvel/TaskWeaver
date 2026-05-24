@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 
-import Particles from 'react-tsparticles';
+import Particles from "react-tsparticles";
 
 import LogoTW2 from '../../components/layout/LogoTW2.png';
 

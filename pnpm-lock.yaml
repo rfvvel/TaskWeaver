@@ -62,6 +62,9 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.2.8
         version: 1.2.8(@types/react-dom@19.2.3(@types/react@19.2.15))(@types/react@19.2.15)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
+      '@tsparticles/react':
+        specifier: ^4.0.5
+        version: 4.0.5(@tsparticles/engine@4.0.5)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -1158,6 +1161,13 @@ packages:
     resolution: {integrity: sha512-+JDxQWW1WupxnDwvN+C0vWQmOvBFkvtvK2MJ6qNjOI9/7Nj8s0xzwm5KGqVUWkaF16K3+AihNjEQRb/M8E5skg==}
     peerDependencies:
       '@tsparticles/engine': 4.0.5
+
+  '@tsparticles/react@4.0.5':
+    resolution: {integrity: sha512-3XJmucy/gOgPzQ+i5ZAt3LD8840xdxLPfbNMuRk8D/fHhxI07SHx/8GhODcqnHHHme1zEf0/zUdFee73PuH+NA==}
+    peerDependencies:
+      '@tsparticles/engine': workspace:^
+      react: '>=16.8.0'
+      react-dom: '>=16.8.0'
 
   '@tsparticles/shape-circle@4.0.5':
     resolution: {integrity: sha512-y2CcWNCnC2m2/DaE5CsWbJSCjKsLbOySdT9qgyezmT/boYHupJuNNNOeXP56Tlq+je1wZpayCIAKOpl+VhBtiw==}
@@ -3455,6 +3465,12 @@ snapshots:
   '@tsparticles/plugin-rgb-color@4.0.5(@tsparticles/engine@4.0.5)':
     dependencies:
       '@tsparticles/engine': 4.0.5
+
+  '@tsparticles/react@4.0.5(@tsparticles/engine@4.0.5)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)':
+    dependencies:
+      '@tsparticles/engine': 4.0.5
+      react: 19.2.6
+      react-dom: 19.2.6(react@19.2.6)
 
   '@tsparticles/shape-circle@4.0.5(@tsparticles/engine@4.0.5)':
     dependencies:
