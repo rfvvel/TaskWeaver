@@ -73,7 +73,6 @@ export function TeamManagement() {
               if (memRes.ok && memData.status === "sukses") {
                 membersList = memData.data.map((m: any) => {
                   const extractedName = m.user_full_name || m.user_fullname || m.username || m.name || `User ${m.user_id}`;
-                  // bpchar dari PostgreSQL bisa punya trailing spaces, trim() wajib
                   const userRole = (m.user_role || '').trim().toUpperCase();
                   
                   return {
@@ -90,7 +89,6 @@ export function TeamManagement() {
               console.error(`Gagal mengambil member untuk grup ${g.group_id}`, e);
             }
 
-            // Ambil invite code dari data group, atau fetch via API jika belum ada
             let inviteCode = g.group_invite_code || g.group_invitecode || g.invite_code || null;
 
             if (!inviteCode) {
@@ -150,13 +148,50 @@ export function TeamManagement() {
     navigator.clipboard.writeText(code); setCopiedCode(code); setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const handleLeaveTeam = (teamId: string) => {
-    const teamToLeave = teams.find(t => t.id === teamId);
-    const updatedTeams = teams.filter(team => team.id !== teamId);
-    setTeams(updatedTeams);
-    
-    if (teamToLeave?.name === activeTeam) {
-      setActiveTeam(updatedTeams.length > 0 ? updatedTeams[0].name : "No Team");
+  const handleLeaveTeam = async (teamId: string) => {
+    const user = getLoggedInUser();
+    if (!user) {
+      alert("Login session lost. Please log in again.");
+      return;
+    }
+    const userId = user.UserID || user.id || user.user_id;
+
+    try {
+      const response = await fetch("http://localhost:3000/api/groupKick", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          group_id: teamId, 
+          user_id: userId, 
+          user_requester_id: userId 
+        })
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status === "sukses") {
+        const teamToLeave = teams.find(t => t.id === teamId);
+        const updatedTeams = teams.filter(team => team.id !== teamId);
+        
+        setTeams(updatedTeams); 
+        
+        if (teamToLeave?.name === activeTeam) {
+          const nextTeam = updatedTeams.length > 0 ? updatedTeams[0].name : "No Team";
+          setActiveTeam(nextTeam);
+          if (updatedTeams.length > 0) {
+            localStorage.setItem("tw_activeTeam", nextTeam);
+          } else {
+            localStorage.removeItem("tw_activeTeam");
+          }
+        }
+        
+        alert("Berhasil keluar dari tim!");
+      } else {
+        alert(result.pesan || "Gagal keluar dari tim.");
+      }
+    } catch (error) {
+      console.error("❌ Error Leave Team:", error);
+      alert("Tidak bisa terhubung ke server.");
     }
   };
 
@@ -256,7 +291,6 @@ export function TeamManagement() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6 text-slate-900 dark:text-slate-100">
-      {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Team Management</h1>
@@ -264,7 +298,6 @@ export function TeamManagement() {
         </div>
         <div className="flex gap-3">
           
-          {/* Join Team Dialog */}
           <Dialog open={joinDialogOpen} onOpenChange={(open) => { setJoinDialogOpen(open); if (!open) { setInviteCodeInput(""); setJoinCodeError(""); } }}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2 rounded-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700">
