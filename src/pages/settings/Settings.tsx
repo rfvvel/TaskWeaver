@@ -72,16 +72,35 @@ type Skill = { id: string; name: string; category: string; level: string };
 
 // Format skill array → string untuk dikirim ke BE: "name,category,level|name,category,level"
 function skillsToString(skills: Skill[]): string {
-  return skills.map(s => `${s.name},${s.category},${s.level}`).join("|");
+  return JSON.stringify(skills);
 }
 
-// Parse string dari BE → skill array
 function parseSkillsFromString(raw: string): Skill[] {
   if (!raw || !raw.trim()) return [];
-  return raw.split("|").filter(Boolean).map((entry, i) => {
-    const [name = "", category = "Other", level = "Beginner"] = entry.split(",").map(s => s.trim());
-    return { id: `s-${i}-${Date.now()}`, name, category, level };
-  });
+
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) return parsed;
+    return [];
+  } catch (e) {
+    return raw.split("|").filter(Boolean).map((entry, i) => {
+      const parts = entry.split(",").map(s => s.trim());
+      let name = parts[0] || "";
+      let category = "Other";
+      let level = "Beginner";
+      if (parts.length > 3) {
+         level = parts.pop() || "Beginner";
+         category = parts.pop() || "Other";
+         name = parts.join(", ");
+      } else {
+         name = parts[0] || "";
+         category = parts[1] || "Other";
+         level = parts[2] || "Beginner";
+      }
+
+      return { id: `s-${i}-${Date.now()}`, name, category, level };
+    });
+  }
 }
 
 function CategoryCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
@@ -156,7 +175,6 @@ export function Settings() {
       });
       const result = await res.json();
       if (res.ok && result.status === "sukses") {
-        // Update localStorage supaya navbar ikut berubah
         const updated = { ...user, UserFullName: fullName, UserEmail: email, UserPhoneNumber: phone };
         localStorage.setItem("user", JSON.stringify(updated));
         setProfileMsg({ ok: true, text: "Profile updated successfully!" });
@@ -170,7 +188,6 @@ export function Settings() {
     }
   };
 
-  // ─── Skills state ──────────────────────────────────────────────────────────
   const [skills,           setSkills]           = useState<Skill[]>([]);
   const [showAddSkill,     setShowAddSkill]     = useState(false);
   const [newSkillName,     setNewSkillName]     = useState("");
@@ -179,7 +196,6 @@ export function Settings() {
   const [isSavingSkills,   setIsSavingSkills]   = useState(false);
   const [skillMsg,         setSkillMsg]         = useState<{ ok: boolean; text: string } | null>(null);
 
-  // Load skills dari BE saat mount
   useEffect(() => {
     if (!userId) return;
     fetch("http://localhost:3000/api/userGetSkill", {
@@ -190,13 +206,13 @@ export function Settings() {
       .then(r => r.json())
       .then(data => {
         if (data.status === "sukses") {
-          setSkills(parseSkillsFromString(data.user_skill || ""));
+          const skillString = data.user_skill || (data.data && data.data.user_skill) || "";
+          setSkills(parseSkillsFromString(skillString));
         }
       })
       .catch(() => {});
   }, [userId]);
 
-  // Simpan skills ke BE (dipanggil setiap add/remove)
   const persistSkills = async (updated: Skill[]) => {
     setSkills(updated);
     setIsSavingSkills(true);
@@ -205,7 +221,6 @@ export function Settings() {
       const res = await fetch("http://localhost:3000/api/userUISkill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // Format: "SkillName,Category,Level|SkillName,Category,Level"
         body: JSON.stringify({ user_id: userId, user_skill: skillsToString(updated) }),
       });
       const result = await res.json();
@@ -238,7 +253,6 @@ export function Settings() {
   const skillsByCategory: Record<string, Skill[]> = {};
   categoryOrder.forEach(cat => { skillsByCategory[cat] = skills.filter(s => s.category === cat); });
 
-  // ─── Password state ────────────────────────────────────────────────────────
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword,     setNewPassword]     = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -277,7 +291,6 @@ export function Settings() {
     }
   };
 
-  // ─── Theme ─────────────────────────────────────────────────────────────────
   const [isDark, setIsDark] = useState<boolean>(() =>
     localStorage.getItem("tw_theme") === "dark" || document.documentElement.classList.contains("dark")
   );

@@ -95,11 +95,19 @@ function SplashScreen() {
 }
 
 function App() {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    return !sessionStorage.getItem("splashShown");
+  });
+
   useEffect(() => {
-    const timer = setTimeout(() => { setLoading(false); }, 4500);
-    return () => clearTimeout(timer);
-  }, []);
+    if (loading) {
+      const timer = setTimeout(() => { 
+        setLoading(false); 
+        sessionStorage.setItem("splashShown", "true"); 
+      }, 4500);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
 
   return (
     <>
