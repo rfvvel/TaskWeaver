@@ -54,6 +54,14 @@ interface Member {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────
+
+// ✅ PERBAIKAN: Fungsi kebal error untuk memformat tanggal
+function safeFormat(dateStr: any, fmt: string) {
+  if (!dateStr) return "No date";
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? "Invalid date" : format(d, fmt);
+}
+
 function getDifficultyColor(score: number) {
   if (score >= 8) return "bg-purple-600";
   if (score >= 6) return "bg-red-600";
@@ -79,14 +87,11 @@ function getStatusColor(status: string) {
 
 // ─── Main Component ───────────────────────────────────────────
 export function TaskManagement() {
-  // ✅ PERBAIKAN: Ambil teams dari context untuk mencari activeGroupId yang sebenarnya
   const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
   
-  // Cari ID grup berdasarkan nama grup yang sedang aktif
   const currentTeamObj = teams?.find(t => t.name === activeTeam);
   const activeGroupId = currentTeamObj?.id;
 
-  // ✅ PERBAIKAN: Ambil user login dengan pencarian key yang lebih aman
   const storedUser = localStorage.getItem("user");
   const currentUser = storedUser ? JSON.parse(storedUser) : null;
   const currentUserId = currentUser?.UserID || currentUser?.user_id || currentUser?.id || null;
@@ -103,7 +108,6 @@ export function TaskManagement() {
   const [isRebalancing, setIsRebalancing] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   
-  // State untuk Fitur File Upload yang dihapus Claude
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [taskFile, setTaskFile] = useState<File | null>(null);
 
@@ -124,7 +128,20 @@ export function TaskManagement() {
         body: JSON.stringify({ Group_Id: activeGroupId }),
       });
       const json = await res.json();
-      if (json.status === "sukses") setTasks(json.data ?? []);
+      if (json.status === "sukses") {
+        // ✅ PERBAIKAN: Normalisasi data dari backend (snake_case) ke frontend (PascalCase)
+        const normalizedTasks = (json.data ?? []).map((t: any) => ({
+          TaskId: t.task_id || t.TaskId,
+          Group_Id: t.group_id || t.Group_Id,
+          TaskName: t.task_title || t.TaskName,
+          TaskDescription: t.task_description || t.TaskDescription,
+          TaskComplexity: t.complexity_score || t.TaskComplexity,
+          TaskDeadline: t.deadline || t.TaskDeadline,
+          TaskPrerequisite: t.prerequisite_task_id || t.TaskPrerequisite,
+          task_status: t.task_status || t.status || "todo",
+        }));
+        setTasks(normalizedTasks);
+      }
     } catch (err) {
       console.error("Gagal fetch tasks:", err);
     } finally {
@@ -163,8 +180,21 @@ export function TaskManagement() {
         body: JSON.stringify({ task_id }),
       });
       const json = await res.json();
-      if (json.status === "sukses") setSubtasks(json.data ?? []);
-      else setSubtasks([]);
+      if (json.status === "sukses") {
+        // ✅ PERBAIKAN: Normalisasi subtask
+        const normalizedSubtasks = (json.data ?? []).map((s: any) => ({
+          detail_task_id: s.detail_task_id || s.DetailTaskId,
+          task_id: s.task_id || s.TaskId,
+          user_id: s.user_id || s.UserId,
+          detail_task_name: s.detail_task_name || s.DetailTaskName,
+          detail_task_deadline: s.detail_task_deadline || s.DetailTaskDeadline,
+          detail_task_status: s.detail_task_status || s.DetailTaskStatus,
+          assigned_user_name: s.assigned_user_name || s.user_full_name,
+        }));
+        setSubtasks(normalizedSubtasks);
+      } else {
+        setSubtasks([]);
+      }
     } catch (err) {
       console.error("Gagal fetch subtasks:", err);
       setSubtasks([]);
@@ -187,22 +217,17 @@ export function TaskManagement() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          Group_id: activeGroupId, // SEKARANG PASTI ADA ISINYA
+          Group_id: activeGroupId,
           TaskName: formData.TaskName,
           TaskDescription: formData.TaskDescription,
           TaskComplexity: formData.TaskComplexity,
           TaskDeadline: formData.TaskDeadline,
           TaskPrerequisite: formData.TaskPrerequisite,
-          CreatorId: currentUserId, // SEKARANG PASTI ADA ISINYA
+          CreatorId: currentUserId,
         }),
       });
       const json = await res.json();
       if (json.status === "sukses") {
-        
-        // TODO: Jika API Upload file sudah siap, lempar `taskFile` di sini menggunakan FormData
-        // const newTaskId = json.data.TaskId;
-        // await handleUploadFile(newTaskId, taskFile);
-
         setDialogOpen(false);
         resetForm();
         fetchTasks();
@@ -344,7 +369,7 @@ export function TaskManagement() {
 
   const resetForm = () => {
     setFormData(emptyForm);
-    setTaskFile(null); // Reset file
+    setTaskFile(null); 
   };
 
   const openEditDialog = (task: Task) => {
@@ -413,7 +438,6 @@ export function TaskManagement() {
                 className="rounded-xl min-h-[100px] dark:bg-slate-950 dark:border-slate-800" />
             </div>
             
-            {/* UI File Upload yang dibalikin */}
             <div className="space-y-2">
               <Label>Attachment (Optional)</Label>
               <div className="flex items-center gap-3">
@@ -457,6 +481,7 @@ export function TaskManagement() {
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal rounded-xl dark:bg-slate-950 dark:border-slate-800">
                       <CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
+                      {/* ✅ PERBAIKAN: Cukup pakai operator ternary, tidak perlu format safe di sini karena sudah aman dari state Date */}
                       {formData.TaskDeadline ? format(new Date(formData.TaskDeadline), "PPP") : "Pick a date"}
                     </Button>
                   </PopoverTrigger>
@@ -496,7 +521,8 @@ export function TaskManagement() {
                   {selectedTask.TaskDescription}
                 </DialogDescription>
                 <p className="text-sm text-slate-500 mt-1">
-                  Deadline: {format(new Date(selectedTask.TaskDeadline), "PPP")}
+                  {/* ✅ PERBAIKAN: Gunakan safeFormat agar tidak crash */}
+                  Deadline: {safeFormat(selectedTask.TaskDeadline, "PPP")}
                 </p>
               </DialogHeader>
 
@@ -571,7 +597,8 @@ export function TaskManagement() {
                             {sub.detail_task_name}
                           </span>
                           <p className="text-xs text-slate-400 mt-0.5">
-                            Deadline: {format(new Date(sub.detail_task_deadline), "MMM dd, yyyy")}
+                            {/* ✅ PERBAIKAN: Gunakan safeFormat agar tidak crash */}
+                            Deadline: {safeFormat(sub.detail_task_deadline, "MMM dd, yyyy")}
                           </p>
                         </div>
                       </div>
@@ -624,7 +651,8 @@ export function TaskManagement() {
                       </Badge>
                       <Badge variant="outline" className="rounded-md gap-1 bg-slate-50 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-400">
                         <CalendarIcon className="w-3 h-3 text-slate-400" />
-                        {format(new Date(task.TaskDeadline), "MMM dd")}
+                        {/* ✅ PERBAIKAN: Gunakan safeFormat agar tidak crash */}
+                        {safeFormat(task.TaskDeadline, "MMM dd")}
                       </Badge>
                       <Badge variant="outline" className="rounded-md gap-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/50">
                         <Users className="w-3 h-3" /> {task.task_status ?? "todo"}
