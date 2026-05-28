@@ -72,17 +72,17 @@ export function TeamManagement() {
               
               if (memRes.ok && memData.status === "sukses") {
                 membersList = memData.data.map((m: any) => {
-                  const extractedName = m.user_full_name || m.user_fullname || m.username || m.name || `User ${m.user_id}`;
-                  const userRole = (m.user_role || '').trim().toUpperCase();
-                  
-                  return {
-                    id: String(m.user_id || m.id || Math.random()),
-                    name: extractedName,
-                    email: m.user_email || m.email || "No Email",
-                    role: userRole === 'A' ? "admin" : "member",
-                    avatarSeed: extractedName,
-                    joinDate: m.join_date ? new Date(m.join_date).toLocaleDateString() : "Joined recently"
-                  };
+                    // Log ini akan muncul di F12 Console untuk melihat struktur data yang sebenarnya
+                    console.log("Data member mentah:", m); 
+                    
+                    return {
+                        id: String(m.user_id),
+                        name: m.user_full_name || m.name || "Unknown User", 
+                        email: m.user_email || "No Email",
+                        role: m.user_role === 'A' ? "admin" : "member",
+                        avatarSeed: m.user_full_name || "U",
+                        joinDate: m.join_date || "Joined recently"
+                    };
                 });
               }
             } catch (e) {
