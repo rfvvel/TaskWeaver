@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
   Plus, Edit, Trash2, Calendar as CalendarIcon, ListChecks,
@@ -18,9 +18,6 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "../../components/ui/select";
 import { Calendar } from "../../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
 import { format } from "date-fns";
@@ -82,13 +79,17 @@ function getStatusColor(status: string) {
 
 // ─── Main Component ───────────────────────────────────────────
 export function TaskManagement() {
-  // Context dari router — berisi activeTeam (nama group) dan activeGroupId (number)
-  const { activeTeam, activeGroupId } = useOutletContext<{ activeTeam: string; activeGroupId: number }>();
+  // ✅ PERBAIKAN: Ambil teams dari context untuk mencari activeGroupId yang sebenarnya
+  const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
+  
+  // Cari ID grup berdasarkan nama grup yang sedang aktif
+  const currentTeamObj = teams?.find(t => t.name === activeTeam);
+  const activeGroupId = currentTeamObj?.id;
 
-  // Ambil user login dari localStorage
+  // ✅ PERBAIKAN: Ambil user login dengan pencarian key yang lebih aman
   const storedUser = localStorage.getItem("user");
   const currentUser = storedUser ? JSON.parse(storedUser) : null;
-  const currentUserId = currentUser?.UserID ?? currentUser?.user_id ?? null;
+  const currentUserId = currentUser?.UserID || currentUser?.user_id || currentUser?.id || null;
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(false);
@@ -101,6 +102,10 @@ export function TaskManagement() {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isRebalancing, setIsRebalancing] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
+  
+  // State untuk Fitur File Upload yang dihapus Claude
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [taskFile, setTaskFile] = useState<File | null>(null);
 
   const emptyForm = {
     TaskName: "", TaskDescription: "", TaskComplexity: 5,
@@ -182,17 +187,22 @@ export function TaskManagement() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          Group_id: activeGroupId,
+          Group_id: activeGroupId, // SEKARANG PASTI ADA ISINYA
           TaskName: formData.TaskName,
           TaskDescription: formData.TaskDescription,
           TaskComplexity: formData.TaskComplexity,
           TaskDeadline: formData.TaskDeadline,
           TaskPrerequisite: formData.TaskPrerequisite,
-          CreatorId: currentUserId,
+          CreatorId: currentUserId, // SEKARANG PASTI ADA ISINYA
         }),
       });
       const json = await res.json();
       if (json.status === "sukses") {
+        
+        // TODO: Jika API Upload file sudah siap, lempar `taskFile` di sini menggunakan FormData
+        // const newTaskId = json.data.TaskId;
+        // await handleUploadFile(newTaskId, taskFile);
+
         setDialogOpen(false);
         resetForm();
         fetchTasks();
@@ -332,7 +342,10 @@ export function TaskManagement() {
     }
   };
 
-  const resetForm = () => setFormData(emptyForm);
+  const resetForm = () => {
+    setFormData(emptyForm);
+    setTaskFile(null); // Reset file
+  };
 
   const openEditDialog = (task: Task) => {
     setEditingTask(task);
@@ -343,6 +356,7 @@ export function TaskManagement() {
       TaskDeadline: task.TaskDeadline,
       TaskPrerequisite: task.TaskPrerequisite,
     });
+    setTaskFile(null);
     setDialogOpen(true);
   };
 
@@ -350,6 +364,12 @@ export function TaskManagement() {
     setEditingTask(null);
     resetForm();
     setDialogOpen(true);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setTaskFile(e.target.files[0]);
+    }
   };
 
   // ─────────────────────────────────────────────────────────────
@@ -366,6 +386,7 @@ export function TaskManagement() {
         <Button
           className="gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 shadow-md text-white px-6"
           onClick={openCreateDialog}
+          disabled={!activeGroupId}
         >
           <Plus className="w-4 h-4" /> Create Task
         </Button>
@@ -384,12 +405,45 @@ export function TaskManagement() {
                 onChange={(e) => setFormData({ ...formData, TaskName: e.target.value })}
                 className="rounded-xl dark:bg-slate-950 dark:border-slate-800" />
             </div>
+            
             <div className="space-y-2">
               <Label>Description</Label>
               <Textarea placeholder="Describe the overall goal..." value={formData.TaskDescription}
                 onChange={(e) => setFormData({ ...formData, TaskDescription: e.target.value })}
                 className="rounded-xl min-h-[100px] dark:bg-slate-950 dark:border-slate-800" />
             </div>
+            
+            {/* UI File Upload yang dibalikin */}
+            <div className="space-y-2">
+              <Label>Attachment (Optional)</Label>
+              <div className="flex items-center gap-3">
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  onChange={handleFileChange}
+                />
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-xl border-dashed border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400"
+                >
+                  <Paperclip className="w-4 h-4 mr-2" />
+                  Select File
+                </Button>
+                {taskFile && (
+                  <Badge variant="secondary" className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 px-3 py-1">
+                    <FileText className="w-3 h-3" />
+                    <span className="truncate max-w-[150px]">{taskFile.name}</span>
+                    <button type="button" onClick={() => setTaskFile(null)} className="ml-1 hover:text-red-500">
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                )}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Complexity Score (1-10)</Label>
@@ -438,7 +492,9 @@ export function TaskManagement() {
                   </Badge>
                 </div>
                 <DialogTitle className="text-2xl">{selectedTask.TaskName}</DialogTitle>
-                <DialogDescription className="text-base mt-2 dark:text-slate-300">{selectedTask.TaskDescription}</DialogDescription>
+                <DialogDescription className="text-base mt-2 dark:text-slate-300 whitespace-pre-line">
+                  {selectedTask.TaskDescription}
+                </DialogDescription>
                 <p className="text-sm text-slate-500 mt-1">
                   Deadline: {format(new Date(selectedTask.TaskDeadline), "PPP")}
                 </p>
