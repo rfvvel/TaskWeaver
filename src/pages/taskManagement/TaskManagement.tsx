@@ -181,7 +181,6 @@ export function TaskManagement() {
       });
       const json = await res.json();
       if (json.status === "sukses") {
-        // ✅ PERBAIKAN: Normalisasi subtask
         const normalizedSubtasks = (json.data ?? []).map((s: any) => ({
           detail_task_id: s.detail_task_id || s.DetailTaskId,
           task_id: s.task_id || s.TaskId,
@@ -189,7 +188,7 @@ export function TaskManagement() {
           detail_task_name: s.detail_task_name || s.DetailTaskName,
           detail_task_deadline: s.detail_task_deadline || s.DetailTaskDeadline,
           detail_task_status: s.detail_task_status || s.DetailTaskStatus,
-          assigned_user_name: s.assigned_user_name || s.user_full_name,
+          assigned_user_name: s.UserFullName || s.user_full_name || s.assigned_user_name,
         }));
         setSubtasks(normalizedSubtasks);
       } else {
@@ -507,7 +506,7 @@ export function TaskManagement() {
 
       {/* Task Details + AI Breakdown Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
-        <DialogContent className="rounded-2xl max-w-3xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 border dark:border-slate-800">
+        <DialogContent className="rounded-2xl max-w-3xl max-h-[85vh] overflow-y-auto bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 border dark:border-slate-800">
           {selectedTask && (
             <>
               <DialogHeader>
