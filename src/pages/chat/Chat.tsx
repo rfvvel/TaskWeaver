@@ -56,7 +56,6 @@ interface Channel {
   isDefault: boolean;
 }
 
-// Tidak ada channel default otomatis (kosong saat awal grup dibuat)
 const SEED_CHANNELS: Channel[] = [];
 
 const STATUS_CYCLE = ["online", "online", "away", "online", "offline"] as const;
@@ -269,7 +268,6 @@ export function Chat() {
       {/* ── Main Card ── */}
       <Card className="border-slate-200 dark:border-slate-800 shadow-sm h-[calc(100vh-8rem)] bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
         <CardContent className="p-0 h-full">
-          {/* PERBAIKAN: Memperbaiki typo h-fullw menjadi h-full agar grid sejajar horizontal */}
           <div className="flex h-full">
 
             {/* ── Left: Channels Sidebar ── */}
@@ -297,13 +295,13 @@ export function Chat() {
                     {channels.map((ch) => {
                       const isActive = ch.id === currentChannelId;
                       return (
-                        <div key={ch.id} className="group/ch flex items-center gap-1 pr-1">
+                        <div key={ch.id} className="flex items-center gap-1 pr-1">
                           <button
                             onClick={() => setActiveChannelIdWrapper(ch)}
                             className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors min-w-0 ${
                               isActive
                                 ? "bg-gradient-to-r from-indigo-600 to-cyan-500 text-white"
-                                : "hover:bg-slate-100 dark:hover:bg-slate-800"
+                                : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
                             }`}
                           >
                             <Hash className="w-3.5 h-3.5 shrink-0" />
@@ -313,27 +311,27 @@ export function Chat() {
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <button
-                                className={`w-6 h-6 flex items-center justify-center rounded opacity-0 group-hover/ch:opacity-100 transition-opacity shrink-0 ${
-                                  isActive
-                                    ? "text-white/70 hover:text-white hover:bg-white/20"
-                                    : "text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
-                                }`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
+                                    className={`w-7 h-7 flex items-center justify-center rounded-md transition-all shrink-0 ml-1 ${
+                                      isActive
+                                        ? "text-green-500 hover:text-red-100 hover:bg-white/20" 
+                                        : "text-green-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                    }`}
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </AlertDialogTrigger>
-                            <AlertDialogContent className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white">
+                            <AlertDialogContent className="rounded-2xl max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white shadow-2xl">
                               <AlertDialogHeader>
-                                <AlertDialogTitle>Delete #{ch.name}?</AlertDialogTitle>
-                                <AlertDialogDescription className="text-slate-400">
+                                <AlertDialogTitle className="text-slate-900 dark:text-white">Delete #{ch.name}?</AlertDialogTitle>
+                                <AlertDialogDescription className="text-slate-500 dark:text-slate-400">
                                   All messages will be permanently deleted.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel className="rounded-xl border-slate-200 dark:border-slate-800">Cancel</AlertDialogCancel>
+                              <AlertDialogFooter className="gap-2 sm:gap-0">
+                                <AlertDialogCancel className="mt-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors">Cancel</AlertDialogCancel>
                                 <AlertDialogAction
                                   onClick={() => handleDeleteChannel(ch)}
-                                  className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
+                                  className="rounded-xl bg-red-600 hover:bg-red-700 text-white border-none shadow-sm transition-colors"
                                 >
                                   Delete
                                 </AlertDialogAction>
