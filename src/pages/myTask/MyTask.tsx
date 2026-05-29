@@ -253,46 +253,53 @@ export function MyTasks() {
       )}
 
       {/* Dialog Submit Work */}
+      {/* Dialog Submit Work */}
       <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
-        <DialogContent className="rounded-2xl bg-card border border-border sm:max-w-md text-foreground">
+        <DialogContent className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 sm:max-w-md text-slate-900 dark:text-slate-50">
           <DialogHeader>
             <DialogTitle>Submit Your Work</DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              Attach a link or upload a file to mark <span className="font-semibold text-foreground">"{submittingTask?.title}"</span> as completed.
+            <DialogDescription className="text-slate-500 dark:text-slate-400">
+              Attach a link or upload a file to mark <span className="font-semibold text-slate-900 dark:text-slate-100">"{submittingTask?.title}"</span> as completed.
             </DialogDescription>
           </DialogHeader>
+          
           <Tabs defaultValue="link" className="w-full mt-2" onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-2 bg-muted rounded-xl mb-4 border border-border">
-              <TabsTrigger value="link">Link URL</TabsTrigger>
-              <TabsTrigger value="file">Upload File</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 bg-slate-100 dark:bg-slate-800/50 rounded-xl mb-4 p-1">
+              <TabsTrigger value="link" className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">Link URL</TabsTrigger>
+              <TabsTrigger value="file" className="rounded-lg data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">Upload File</TabsTrigger>
             </TabsList>
+            
             <TabsContent value="link" className="space-y-4 py-2">
               <div className="space-y-2">
                 <Label>Submission URL</Label>
                 <div className="relative">
-                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input
                     placeholder="e.g. https://github.com/..."
-                    className="rounded-xl pl-9 bg-background border-border text-foreground"
+                    className="rounded-xl pl-9 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-50 focus-visible:ring-indigo-500"
                     value={submissionLink}
                     onChange={(e) => setSubmissionLink(e.target.value)}
                   />
                 </div>
               </div>
             </TabsContent>
+            
             <TabsContent value="file" className="space-y-4 py-2">
               <div className="space-y-2">
                 <Label>Document File</Label>
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-border border-dashed rounded-xl cursor-pointer hover:bg-muted transition-colors">
-                  <UploadCloud className="w-8 h-8 text-muted-foreground mb-2" />
-                  <p className="text-sm text-muted-foreground"><span className="font-semibold text-indigo-500">Click to upload</span></p>
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 dark:border-slate-700 border-dashed rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                  <UploadCloud className="w-8 h-8 text-slate-400 mb-2" />
+                  <p className="text-sm text-slate-500 dark:text-slate-400"><span className="font-semibold text-indigo-500">Click to upload</span></p>
                 </label>
               </div>
             </TabsContent>
           </Tabs>
+
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setSubmitDialogOpen(false)} className="rounded-xl">Cancel</Button>
-            <Button onClick={confirmSubmit} className="rounded-xl bg-green-600 hover:bg-green-700 text-white">
+            <Button variant="outline" onClick={() => setSubmitDialogOpen(false)} className="rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
+              Cancel
+            </Button>
+            <Button onClick={confirmSubmit} className="rounded-xl bg-green-600 hover:bg-green-700 text-white border-none">
               Submit & Complete
             </Button>
           </DialogFooter>
