@@ -119,7 +119,7 @@ export function Chat() {
     name.split(" ").map((n) => n[0]).join("").toUpperCase();
 
   const slugify = (s: string) =>
-    s.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+    s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
   const setActiveChannelIdWrapper = (ch: Channel) =>
     setActiveChannelId((prev) => ({ ...prev, [activeTeam]: ch.id }));
@@ -148,12 +148,24 @@ export function Chat() {
   // ── Create channel ─────────────────────────────────────────────────────────
 
   const handleCreateChannel = () => {
+    const trimmedInput = channelName.trim();
+    if (!trimmedInput) { 
+      setNameError("Channel name cannot be empty."); 
+      return; 
+    }
+
+    const wordCount = trimmedInput.split(/\s+/).length;
+    if (wordCount > 3) {
+      setNameError("Maximum limit is 3 words.");
+      return;
+    }
+
     const slug = slugify(channelName);
-    if (!slug) { setNameError("Channel name cannot be empty."); return; }
     if (channels.some((c) => c.name === slug)) {
       setNameError(`#${slug} already exists in this team.`);
       return;
     }
+
     const newCh: Channel = {
       id: `c-${Date.now()}`,
       name: slug,
@@ -231,7 +243,7 @@ export function Chat() {
                 </span>
                 <Input
                   id="ch-name"
-                  placeholder="e.g. backend-api"
+                  placeholder="e.g. backend api design"
                   value={channelName}
                   onChange={(e) => { setChannelName(e.target.value); if (nameError) setNameError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleCreateChannel()}
@@ -244,7 +256,7 @@ export function Chat() {
                 </p>
               ) : (
                 <p className="text-xs text-slate-400 dark:text-slate-500">
-                  Lowercase, numbers, and hyphens only.
+                  Maximum 3 words. Lowercase, numbers, and hyphens only.
                 </p>
               )}
             </div>
@@ -295,29 +307,40 @@ export function Chat() {
                     {channels.map((ch) => {
                       const isActive = ch.id === currentChannelId;
                       return (
-                        <div key={ch.id} className="flex items-center gap-1 pr-1">
+                        /* KUNCI UTAMA DI SINI:
+                          w-[224px] & max-w-[224px] membatasi lebar total baris (240px sidebar - padding kiri kanan 16px).
+                        */
+                        <div 
+                          key={ch.id} 
+                          className={`flex items-center justify-between w-[224px] max-w-[224px] p-1 rounded-lg transition-colors gap-1 ${
+                            isActive
+                              ? "bg-gradient-to-r from-indigo-600 to-cyan-500 text-white"
+                              : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                          }`}
+                        >
+                          {/* flex-1 dan w-0 memaksa button mengalah saat teks memanjang */}
                           <button
                             onClick={() => setActiveChannelIdWrapper(ch)}
-                            className={`flex-1 flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors min-w-0 ${
-                              isActive
-                                ? "bg-gradient-to-r from-indigo-600 to-cyan-500 text-white"
-                                : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-                            }`}
+                            className="flex items-center gap-2 px-2 py-1 flex-1 w-0 text-sm text-left"
                           >
-                            <Hash className="w-3.5 h-3.5 shrink-0" />
-                            <span className="flex-1 text-left truncate">{ch.name}</span>
+                            <Hash className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-white" : "text-slate-400"}`} />
+                            {/* truncate diatur pada block span */}
+                            <span className="block truncate w-full" title={ch.name}>
+                              {ch.name}
+                            </span>
                           </button>
 
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
+                              {/* shrink-0 mengunci tombol trash agar ukurannya tidak mengecil */}
                               <button
-                                    className={`w-7 h-7 flex items-center justify-center rounded-md transition-all shrink-0 ml-1 ${
-                                      isActive
-                                        ? "text-green-500 hover:text-red-100 hover:bg-white/20" 
-                                        : "text-green-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
-                                    }`}
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
+                                className={`w-7 h-7 flex items-center justify-center rounded-md transition-all shrink-0 ml-auto ${
+                                  isActive
+                                    ? "text-red-200 hover:text-red-100 hover:bg-white/20" 
+                                    : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                }`}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </AlertDialogTrigger>
                             <AlertDialogContent className="rounded-2xl max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white shadow-2xl">
