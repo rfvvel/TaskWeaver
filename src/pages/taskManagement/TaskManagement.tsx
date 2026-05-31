@@ -18,9 +18,9 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-import { Calendar } from "../../components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/popover";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const API = "http://localhost:3000/api";
 
@@ -83,6 +83,80 @@ function getStatusColor(status: string) {
     todo: "bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400",
   };
   return map[status] ?? map["todo"];
+}
+
+// ─── Custom Calendar ──────────────────────────────────────────
+function MiniCalendar({ selected, onSelect }: { selected?: Date; onSelect: (date: Date) => void }) {
+  const [viewDate, setViewDate] = useState(selected ?? new Date());
+
+  const start = startOfWeek(startOfMonth(viewDate), { weekStartsOn: 0 });
+  const end = endOfWeek(endOfMonth(viewDate), { weekStartsOn: 0 });
+
+  const days: Date[] = [];
+  let cur = start;
+  while (cur <= end) {
+    days.push(cur);
+    cur = addDays(cur, 1);
+  }
+
+  const DAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+
+  return (
+    <div className="p-3 select-none w-[280px]">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={() => setViewDate(subMonths(viewDate, 1))}
+          className="h-7 w-7 flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <span className="text-sm font-semibold text-slate-800 dark:text-slate-100">
+          {format(viewDate, "MMMM yyyy")}
+        </span>
+        <button
+          onClick={() => setViewDate(addMonths(viewDate, 1))}
+          className="h-7 w-7 flex items-center justify-center rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Day labels */}
+      <div className="grid grid-cols-7 mb-1">
+        {DAY_LABELS.map((d) => (
+          <div key={d} className="h-8 flex items-center justify-center text-xs font-medium text-slate-400 dark:text-slate-500">
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Date grid */}
+      <div className="grid grid-cols-7">
+        {days.map((day, i) => {
+          const isCurrentMonth = isSameMonth(day, viewDate);
+          const isSelected = selected ? isSameDay(day, selected) : false;
+          const isToday = isSameDay(day, new Date());
+
+          return (
+            <button
+              key={i}
+              onClick={() => onSelect(day)}
+              className={[
+                "h-8 w-full flex items-center justify-center text-sm rounded-md transition-colors",
+                !isCurrentMonth && "text-slate-300 dark:text-slate-600",
+                isCurrentMonth && !isSelected && !isToday && "text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800",
+                isToday && !isSelected && "font-semibold bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-slate-100",
+                isSelected && "bg-indigo-600 text-white font-semibold hover:bg-indigo-700",
+              ].filter(Boolean).join(" ")}
+            >
+              {format(day, "d")}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 // ─── Main Component ───────────────────────────────────────────
@@ -485,10 +559,10 @@ export function TaskManagement() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0 rounded-2xl bg-white dark:bg-slate-950 border dark:border-slate-800">
-                    <Calendar mode="single"
+                    <MiniCalendar
                       selected={formData.TaskDeadline ? new Date(formData.TaskDeadline) : undefined}
-                      onSelect={(date) => setFormData({ ...formData, TaskDeadline: date ? date.toISOString() : new Date().toISOString() })}
-                      initialFocus />
+                      onSelect={(date) => setFormData({ ...formData, TaskDeadline: date.toISOString() })}
+                    />
                   </PopoverContent>
                 </Popover>
               </div>
