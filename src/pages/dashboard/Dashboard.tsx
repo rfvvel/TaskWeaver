@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import {
   TrendingUp, Users, Target, Calendar as CalendarIcon,
-  Brain, AlertCircle, CheckCircle2, Clock, Shuffle, UserPlus,
-  PlusCircle, Activity, ChevronRight,
-  ListChecks, ArrowUpRight, Flame,
+  Brain, CheckCircle2, Clock, Shuffle, UserPlus,
+  Activity, ChevronRight, ListChecks, ArrowUpRight, Loader2
 } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
@@ -13,16 +12,19 @@ import { Badge } from "../../components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 
+const API = "http://localhost:3000/api";
 
-interface SubTask { id: string; title: string; assignedTo: string; avatarSeed: string; status: "todo" | "in-progress" | "completed"; }
-interface Task { id: string; team: string; title: string; description: string; attachment: string | null; difficulty: string; dueDate: string; assignedTo: string | null; tags: string[]; status: string; subtasks: SubTask[]; }
-interface BigTask { id: string; title: string; status: "todo" | "in-progress" | "completed"; deadline: string; }
-interface TeamMember { id: string; name: string; email: string; role: "admin" | "member"; avatarSeed: string; joinDate: string; }
-interface Team { id: string; name: string; description: string; inviteCode: string; members: TeamMember[]; bigTasks: BigTask[]; }
+// ─── Interfaces ───
+interface MyTask {
+  id: number;
+  taskId: number;
+  title: string;
+  bigTaskTitle: string;
+  deadline: string;
+  status: string;
+}
 
-const TASKS_KEY = "tw_tasks";
-const CURRENT_USER = "Lie Darren";
-
+// ─── Helpers (Sementara untuk UI Workload Persentase) ───
 const WL_PATTERNS = [38, 65, 28, 52, 45, 72, 20, 58, 33, 61];
 type WStatus = "under-utilized" | "balanced" | "slightly-high" | "overloaded";
 const getWL = (i: number) => WL_PATTERNS[i % WL_PATTERNS.length];
@@ -41,95 +43,184 @@ function StatusBadge({ s }: { s: WStatus }) {
   return <Badge variant="outline" className={`text-[10px] font-semibold ${cls[s]}`}>{lbl[s]}</Badge>;
 }
 
-function EmptyState() {
-  const navigate = useNavigate();
-  return (
-    <div className="flex flex-col items-center justify-center min-h-[70vh] p-8">
-      <div className="relative mb-8">
-        <div className="w-40 h-40 rounded-full border-2 border-dashed border-blue-200 dark:border-blue-900 flex items-center justify-center">
-          <div className="w-28 h-28 rounded-full border-2 border-dashed border-blue-300 dark:border-blue-800 flex items-center justify-center">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-200 dark:shadow-none">
-              <Users className="w-8 h-8 text-white" />
-            </div>
-          </div>
-        </div>
-        <div className="absolute top-2 right-2 w-4 h-4 rounded-full bg-blue-400 animate-bounce" />
-        <div className="absolute bottom-4 left-0 w-3 h-3 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: "0.3s" }} />
-      </div>
-      <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-50 mb-2 text-center">You're not part of any team yet</h2>
-      <p className="text-slate-500 dark:text-slate-400 text-center max-w-sm mb-8">Create or join a team to start collaborating.</p>
-      <div className="w-full max-w-xs flex gap-3">
-       <Button
-            onClick={() => navigate("/team-management")}
-            className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white gap-2 w-full"
-          >
-            <UserPlus className="w-4 h-4" /> Create or Join a Team
-          </Button>
-      </div>
-    </div>
-  );
-}
-
-const MOCK_ACTIVITY = [
-  { id: 1, type: "completed", user: "Lie Darren", action: "completed", target: "Video Editing & Render", time: "2 hours ago" },
-  { id: 2, type: "started", user: "Steven Nathaniel", action: "started", target: "Video Taking / Shooting", time: "4 hours ago" },
-  { id: 3, type: "completed", user: "Evan Varian", action: "completed", target: "Konsep & Planner Iklan", time: "1 day ago" },
-];
-
 function ActivityDot({ type }: { type: string }) {
-  const bg = type === "completed" ? "bg-green-100 dark:bg-green-950/50" : type === "started" ? "bg-amber-100 dark:bg-amber-950/50" : "bg-indigo-100 dark:bg-indigo-950/50";
-  const ic = type === "completed" ? "text-green-600 dark:text-green-400" : type === "started" ? "text-amber-500 dark:text-amber-400" : "text-indigo-500 dark:text-indigo-400";
-  const Icon = type === "completed" ? CheckCircle2 : Clock;
+  const isStarted = type?.toLowerCase().includes("in-progress") || type?.toLowerCase().includes("start");
+  const isCompleted = type?.toLowerCase().includes("completed") || type?.toLowerCase().includes("c");
+  
+  const bg = isCompleted ? "bg-green-100 dark:bg-green-950/50" : isStarted ? "bg-amber-100 dark:bg-amber-950/50" : "bg-indigo-100 dark:bg-indigo-950/50";
+  const ic = isCompleted ? "text-green-600 dark:text-green-400" : isStarted ? "text-amber-500 dark:text-amber-400" : "text-indigo-500 dark:text-indigo-400";
+  const Icon = isCompleted ? CheckCircle2 : Clock;
+  
   return <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${bg}`}><Icon className={`w-4 h-4 ${ic}`} /></div>;
 }
 
+// ─── Main Component ───
 export function Dashboard() {
-  const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: Team[] }>();
+  const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
   const navigate = useNavigate();
+  
   const [rebalanceModal, setRebalanceModal] = useState(false);
+  const [isRebalancing, setIsRebalancing] = useState(false);
 
-  const [allTasks, setAllTasks] = useState<Task[]>(() => {
-    try { const r = localStorage.getItem(TASKS_KEY); return r ? JSON.parse(r) : []; } catch { return []; }
-  });
+  const storedUser = localStorage.getItem("user");
+  const currentUser = storedUser ? JSON.parse(storedUser) : null;
+  const currentUserId = currentUser?.UserID || currentUser?.user_id || currentUser?.id || null;
+
+  const currentTeam = teams?.find((t: any) => t.name === activeTeam);
+  const groupId = currentTeam?.id;
+
+  // ─── States ───
+  const [members, setMembers] = useState<any[]>([]); 
+  const [myTasks, setMyTasks] = useState<MyTask[]>([]);
+  const [activities, setActivities] = useState<any[]>([]); 
+  const [loading, setLoading] = useState(true);
+
+  // ─── Fetch Data Dashboard ───
+  const fetchDashboardData = useCallback(async () => {
+    if (!groupId || !currentUserId) return;
+    setLoading(true);
+
+    try {
+      // 1. Fetch Data Member
+      const resMembers = await fetch(`${API}/groupGetMember`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: groupId }),
+      });
+      const dataMembers = await resMembers.json();
+      if (dataMembers.status === "sukses") setMembers(dataMembers.data || []);
+
+      // 2. Fetch My Sub-Tasks
+      const resMyTasks = await fetch(`${API}/detailTaskGetByUser`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: currentUserId }),
+      });
+      const dataMyTasks = await resMyTasks.json();
+      if (dataMyTasks.status === "sukses") {
+        const formattedTasks: MyTask[] = (dataMyTasks.data || []).map((t: any) => ({
+          id: t.DetailTaskId || t.detail_task_id,
+          taskId: t.TaskId || t.task_id,
+          title: t.DetailTaskName || t.detail_task_name,
+          bigTaskTitle: `Task #${t.TaskId || t.task_id}`,
+          deadline: t.DetailTaskDeadline || t.detail_task_deadline,
+          status: t.DetailTaskStatus || t.detail_task_status || "todo",
+        }));
+        setMyTasks(formattedTasks);
+      }
+
+      // 3. Fetch Team Activity Log
+      const resActivity = await fetch(`${API}/getActivityByGroup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: groupId }),
+      });
+      const dataActivity = await resActivity.json();
+      if (dataActivity.status === "sukses") {
+        setActivities(dataActivity.data || []);
+      }
+
+    } catch (err) {
+      console.error("Gagal fetch dashboard data:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [groupId, currentUserId]);
 
   useEffect(() => {
-    const refresh = () => {
-      try { const r = localStorage.getItem(TASKS_KEY); if (r) setAllTasks(JSON.parse(r)); } catch {}
+    fetchDashboardData();
+  }, [fetchDashboardData]);
+
+  // ─── Kalkulasi Data ───
+  const membersCount = members.length;
+  
+  // ✅ DETEKSI ROLE ADMIN YANG SUDAH KEBAL PELURU
+  const currentUserData = members.find(m => String(m.user_id) === String(currentUserId) || String(m.UserId) === String(currentUserId));
+  // Mengambil role dari berbagai kemungkinan nama kolom database
+  const rawRole = String(currentUserData?.user_role || currentUserData?.role || currentUserData?.role_name || currentUserData?.RoleName || "").toLowerCase();
+  const isUserAdmin = rawRole.includes("admin");
+
+  const totalMyTasks = myTasks.length; 
+  const completedMyTasks = myTasks.filter(t => t.status === "completed" || t.status === "C").length;
+  const pendingMyTasks = myTasks.filter(t => t.status !== "completed" && t.status !== "C");
+  const progressPercent = totalMyTasks > 0 ? Math.round((completedMyTasks / totalMyTasks) * 100) : 0;
+
+  // Logika Upcoming Deadlines (Max 7 Hari ke depan)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const nextWeek = new Date(today);
+  nextWeek.setDate(today.getDate() + 7);
+
+  const upcomingDeadlines = myTasks
+    .filter(t => {
+      if (t.status === "completed" || t.status === "C") return false;
+      if (!t.deadline) return false;
+      const d = new Date(t.deadline);
+      return d >= today && d <= nextWeek;
+    })
+    .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
+    .slice(0, 5);
+
+  // Mapping Nama Asli Member & Kalkulasi Workload UI
+  const membersWL = members.map((m, i) => {
+    // 💡 CATATAN UNTUK NANTI: 
+    // Kalau backend sudah mengirimkan jumlah tugas pending per member di 'groupGetMember', 
+    // kamu bisa ganti getWL(i) di bawah ini dengan rumus asli: 
+    // const w = Math.round((m.pending_tasks / total_pending_di_grup) * 100);
+
+    const w = getWL(i); // <-- Ini masih mock persentase
+    return { 
+      id: m.user_id || m.UserId, 
+      name: m.user_full_name || m.name || `Member ${i+1}`, 
+      role: m.user_role || m.role || "Member", 
+      workload: w, 
+      wStatus: getWS(w), 
+      tasks: Math.floor(w / 10) 
     };
-    window.addEventListener("focus", refresh);
-    window.addEventListener("storage", refresh);
-    return () => { window.removeEventListener("focus", refresh); window.removeEventListener("storage", refresh); };
-  }, []);
-
-  if (!teams || teams.length === 0) return <EmptyState />;
-
-  const team = teams.find((t) => t.name === activeTeam) ?? teams[0];
-  const teamTasks = allTasks.filter((t) => t.team === team.name);
-  const totalTasks = teamTasks.length;
-  const completedTasks = teamTasks.filter((t) => t.status === "completed").length;
-  const inProgressTasks = teamTasks.filter((t) => t.status === "in-progress").length;
-  const sprintProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-
-  const myDeadlines = teamTasks.flatMap((t) =>
-    t.subtasks
-      .filter((s) => s.assignedTo === CURRENT_USER && s.status !== "completed")
-      .map((s) => ({
-        id: s.id, taskId: t.id, title: s.title, bigTask: t.title, deadline: t.dueDate,
-        priority: (t.difficulty === "expert" || t.difficulty === "hard") ? "high" : t.difficulty === "medium" ? "medium" : "low",
-        status: s.status,
-      }))
-  );
-
-  // Workload per member
-  const membersWL = team.members.map((m, i) => {
-    const w = getWL(i); return { ...m, workload: w, wStatus: getWS(w), tasks: Math.floor(w / 10) };
   });
+  
   const overloaded = membersWL.find((m) => m.wStatus === "overloaded") ?? membersWL[0];
   const under = membersWL.find((m) => m.wStatus === "under-utilized") ?? membersWL[membersWL.length - 1];
-  const hasOverload = membersWL.some((m) => m.wStatus === "overloaded");
-  const hasHigh = membersWL.some((m) => m.wStatus === "overloaded" || m.wStatus === "slightly-high");
 
-  const priCls = (p: string) => p === "high" ? "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50" : p === "medium" ? "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50" : "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50";
+  // ✅ Fungsi Eksekusi Rebalance Group
+  const handleConfirmRebalance = async () => {
+    if (!groupId) return;
+    setIsRebalancing(true);
+    
+    try {
+      const res = await fetch(`${API}/groupRebalance`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: groupId })
+      });
+      
+      const json = await res.json();
+      if (json.status === "sukses") {
+        alert("Sukses: " + json.pesan);
+        fetchDashboardData(); 
+      } else {
+        alert("Gagal rebalance: " + json.pesan);
+      }
+    } catch (err) {
+      console.error("Error rebalance:", err);
+      alert("Terjadi kesalahan pada server saat memanggil AI.");
+    } finally {
+      setIsRebalancing(false);
+      setRebalanceModal(false);
+    }
+  };
+
+  if (!groupId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] p-8">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-50 mb-2">You're not in any active team</h2>
+        <p className="text-slate-500 dark:text-slate-400 mb-8">Please select or join a team first.</p>
+        <Button onClick={() => navigate("/team-management")} className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 text-white">
+          <UserPlus className="w-4 h-4 mr-2" /> Team Management
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
@@ -138,30 +229,29 @@ export function Dashboard() {
         <div>
           <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-50 mb-1">Dashboard</h1>
           <p className="text-slate-500 dark:text-slate-400">
-            Overview for <span className="font-semibold text-blue-600 dark:text-blue-400">{team.name}</span>
-            {team.description && <span className="text-slate-400 dark:text-slate-500"> · {team.description}</span>}
+            Overview for <span className="font-semibold text-blue-600 dark:text-blue-400">{activeTeam}</span>
           </p>
         </div>
         <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50 px-3 py-1.5 flex items-center gap-1.5">
           <span className="w-1.5 h-1.5 rounded-full bg-blue-500 inline-block animate-pulse" />
-          {team.members.length} member{team.members.length !== 1 ? "s" : ""}
+          {membersCount} Member{membersCount !== 1 ? "s" : ""}
         </Badge>
       </div>
 
-      {/* Stat cards */}
+      {/* 4 Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { label: "Team Members", value: team.members.length.toString(), sub: `${team.members.filter(m => m.role === "admin").length} admin(s)`, Icon: Users, accent: "bg-blue-500" },
-          { label: "Total Tasks", value: totalTasks > 0 ? totalTasks.toString() : "—", sub: totalTasks > 0 ? `${inProgressTasks} in progress` : "No tasks yet", Icon: Target, accent: "bg-blue-500" },
-          { label: "Progress", value: totalTasks > 0 ? `${sprintProgress}%` : "—", sub: totalTasks > 0 ? `${completedTasks} of ${totalTasks} done` : "Create tasks first", Icon: TrendingUp, accent: "bg-blue-500" },
-          { label: "My Deadlines", value: myDeadlines.length.toString(), sub: `${myDeadlines.filter(d => d.priority === "high").length} high priority`, Icon: CalendarIcon, accent: "bg-blue-500" },
-        ].map((s) => (
-          <Card key={s.label} className="border-border bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow">
+          { label: "Team Members", value: membersCount.toString(), sub: "Total enrolled", Icon: Users, accent: "bg-blue-500" },
+          { label: "Total Tasks", value: totalMyTasks.toString(), sub: "Total my tasks", Icon: Target, accent: "bg-blue-500" },
+          { label: "My Progress", value: `${progressPercent}%`, sub: `${completedMyTasks} of ${totalMyTasks} done`, Icon: TrendingUp, accent: "bg-blue-500" },
+          { label: "My Deadlines", value: pendingMyTasks.length.toString(), sub: "Tasks left to do", Icon: CalendarIcon, accent: "bg-blue-500" },
+        ].map((s, idx) => (
+          <Card key={idx} className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow">
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div className="space-y-1.5">
                   <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wide">{s.label}</p>
-                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-50">{s.value}</p>
+                  <p className="text-3xl font-bold text-slate-900 dark:text-slate-50">{loading ? "-" : s.value}</p>
                   <p className="text-xs text-slate-400 dark:text-slate-500">{s.sub}</p>
                 </div>
                 <div className={`w-11 h-11 rounded-xl ${s.accent} flex items-center justify-center shadow-lg dark:shadow-none`}>
@@ -173,79 +263,74 @@ export function Dashboard() {
         ))}
       </div>
 
-      {/* Sprint task list */}
-      {teamTasks.length > 0 ? (
-        <Card className="border-border bg-white dark:bg-slate-900 shadow-sm">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-base text-slate-900 dark:text-slate-50"><ListChecks className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />Sprint Tasks</CardTitle>
-                <CardDescription className="dark:text-slate-400">Tasks created for {team.name}</CardDescription>
-              </div>
-              <Button variant="ghost" size="sm" className="gap-1 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 rounded-xl text-xs" onClick={() => navigate("/task-management")}>
-                Manage <ChevronRight className="w-3 h-3" />
-              </Button>
+      {/* Sprint Task List */}
+      <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-base text-slate-900 dark:text-slate-50"><ListChecks className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />My Active Tasks</CardTitle>
+              <CardDescription className="dark:text-slate-400">Sub-tasks you need to complete</CardDescription>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {teamTasks.slice(0, 5).map((task) => {
-              const done = task.subtasks.filter((s) => s.status === "completed").length;
-              const ttl = task.subtasks.length;
-              return (
-                <div key={task.id} className="flex items-center gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 hover:border-indigo-100 dark:hover:border-indigo-900 transition-colors cursor-pointer" onClick={() => navigate("/task-management")}>
-                  <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${task.status === "completed" ? "bg-green-500" : task.status === "in-progress" ? "bg-blue-500" : "bg-slate-300 dark:bg-slate-700"}`} />
-                  <p className={`text-sm flex-1 font-medium ${task.status === "completed" ? "line-through text-slate-400 dark:text-slate-500" : "text-slate-700 dark:text-slate-300"}`}>{task.title}</p>
-                  {ttl > 0 && <span className="text-xs text-slate-400 dark:text-slate-500">{done}/{ttl} sub-tasks</span>}
-                  <Badge variant="outline" className={`text-[10px] ${task.status === "completed" ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-900/50" : task.status === "in-progress" ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50" : "bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400"}`}>
-                    {task.status}
-                  </Badge>
-                </div>
-              );
-            })}
-            {teamTasks.length > 5 && <p className="text-xs text-slate-400 dark:text-slate-500 text-center pt-1">+{teamTasks.length - 5} more</p>}
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="border-dashed border-2 border-slate-200 dark:border-slate-800 bg-transparent shadow-none">
-          <CardContent className="flex flex-col items-center justify-center py-10 gap-3">
-            <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-950/50 rounded-full flex items-center justify-center"><ListChecks className="w-6 h-6 text-indigo-400" /></div>
-            <p className="text-sm text-slate-500 dark:text-slate-400">No tasks yet for <span className="text-slate-700 dark:text-slate-300 font-medium">{team.name}</span></p>
-            <Button size="sm" variant="outline" className="gap-1 rounded-xl border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950" onClick={() => navigate("/task-management")}>
-              <PlusCircle className="w-3.5 h-3.5" /> Add First Task
+            <Button variant="ghost" size="sm" className="gap-1 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 rounded-xl text-xs" onClick={() => navigate("/tasks")}>
+              Manage <ChevronRight className="w-3 h-3" />
             </Button>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+          {pendingMyTasks.length > 0 ? pendingMyTasks.map((task) => (
+            <div key={task.id} onClick={() => navigate("/tasks")} className="flex items-center gap-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-950 border border-slate-100 dark:border-slate-800 hover:border-indigo-100 dark:hover:border-indigo-900 transition-colors cursor-pointer">
+              <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${task.status === "in-progress" ? "bg-blue-500" : "bg-slate-300 dark:bg-slate-700"}`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">{task.title}</p>
+                <p className="text-[10px] text-slate-500 truncate">From: {task.bigTaskTitle}</p>
+              </div>
+              <Badge variant="outline" className={`text-[10px] ${task.status === "in-progress" ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50" : "bg-slate-50 text-slate-500 dark:bg-slate-900 dark:text-slate-400"}`}>
+                {task.status}
+              </Badge>
+            </div>
+          )) : (
+             <div className="text-center py-6">
+               <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
+               <p className="text-sm font-medium text-slate-600 dark:text-slate-300">All caught up!</p>
+               <p className="text-xs text-slate-400 mt-1">You have no pending tasks.</p>
+             </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Workload + My Deadlines */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Workload — 2 cols */}
-        <Card className="lg:col-span-2 border-border bg-white dark:bg-slate-900 shadow-sm">
+        
+        {/* Workload */}
+        <Card className="lg:col-span-2 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50"><Brain className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />AI Workload Distribution</CardTitle>
-                <CardDescription className="dark:text-slate-400">Member balance in {team.name}</CardDescription>
+                <CardDescription className="dark:text-slate-400">Team balance in {activeTeam}</CardDescription>
               </div>
-              <Button size="sm" onClick={() => setRebalanceModal(true)} className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl shadow-md text-xs px-4 gap-1.5 dark:shadow-none">
-                <Shuffle className="w-3.5 h-3.5" /> Rebalance
-              </Button>
+             {/* ✅ Tombol Rebalance HANYA MUNCUL untuk Admin */}
+             {isUserAdmin && (
+                <Button size="sm" onClick={() => setRebalanceModal(true)} className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl shadow-md text-xs px-4 gap-1.5 dark:shadow-none">
+                  <Shuffle className="w-3.5 h-3.5" /> Rebalance
+                </Button>
+              )}
             </div>
           </CardHeader>
           <CardContent className="space-y-3">
-            {membersWL.map((m) => (
+            {membersWL.slice(0, 3).map((m) => (
               <div key={m.id} className={`p-4 rounded-xl border transition-all ${m.wStatus === "overloaded" ? "border-red-200 bg-red-50/40 dark:border-red-900/50 dark:bg-red-950/20" : m.wStatus === "slightly-high" ? "border-amber-200 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/20" : "border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950 hover:border-indigo-100 dark:hover:border-indigo-900"}`}>
                 <div className="flex items-center gap-4">
                   <Avatar className="w-10 h-10 border border-white dark:border-slate-800 shadow-sm">
                     <AvatarFallback className={`text-sm font-semibold ${m.wStatus === "overloaded" ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" : m.wStatus === "slightly-high" ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400"}`}>
-                      {m.name.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                      {m.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-2">
                       <div>
                         <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{m.name}</p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500">{m.tasks} active tasks · {m.role}</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-500">{m.role}</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <StatusBadge s={m.wStatus} />
@@ -256,44 +341,35 @@ export function Dashboard() {
                       <div className={`h-full ${barCls(m.workload)} transition-all duration-700 rounded-full`} style={{ width: `${m.workload}%` }} />
                     </div>
                   </div>
-                  {(m.wStatus === "overloaded" || m.wStatus === "slightly-high") && <Flame className="w-4 h-4 text-red-400 flex-shrink-0" />}
                 </div>
               </div>
             ))}
-            <div className={`flex items-center gap-2 p-3.5 rounded-xl border mt-2 ${hasOverload ? "bg-red-50 border-red-200 dark:bg-red-950/20 dark:border-red-900/50" : hasHigh ? "bg-amber-50 border-amber-200 dark:bg-amber-950/20 dark:border-amber-900/50" : "bg-green-50 border-green-200 dark:bg-green-950/20 dark:border-green-900/50"}`}>
-              {hasOverload ? <><AlertCircle className="w-4 h-4 text-red-600 dark:text-red-400" /><span className="text-sm font-medium text-red-700 dark:text-red-400">Needs Rebalance</span></> :
-               hasHigh ? <><AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400" /><span className="text-sm font-medium text-amber-700 dark:text-amber-400">Consider Rebalancing</span></> :
-               <><CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" /><span className="text-sm font-medium text-green-700 dark:text-green-400">Workload Balanced</span></>}
-            </div>
           </CardContent>
         </Card>
 
-        {/* My Deadlines */}
-        <Card className="border-border bg-white dark:bg-slate-900 shadow-sm">
+        {/* My Upcoming Deadlines */}
+        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
           <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-50"><Clock className="w-4 h-4 text-orange-600 dark:text-orange-400" />My Deadlines</CardTitle>
-            <CardDescription className="text-xs dark:text-slate-400">Your sub-tasks in {team.name}</CardDescription>
+            <CardTitle className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-50"><Clock className="w-4 h-4 text-orange-600 dark:text-orange-400" />My Upcoming Deadlines</CardTitle>
+            <CardDescription className="text-xs dark:text-slate-400">Due in 7 days</CardDescription>
           </CardHeader>
           <CardContent className="space-y-2">
-            {myDeadlines.length > 0 ? myDeadlines.map((d) => (
+            {upcomingDeadlines.length > 0 ? upcomingDeadlines.map((d) => (
               <div key={d.id} className="p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:bg-white dark:hover:bg-slate-900 hover:border-indigo-100 dark:hover:border-indigo-900 transition-all cursor-pointer group" onClick={() => navigate("/tasks")}>
                 <div className="flex items-start justify-between gap-2 mb-1.5">
                   <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex-1 leading-snug group-hover:text-indigo-700 dark:group-hover:text-indigo-400 transition-colors">{d.title}</p>
-                  <Badge variant="outline" className={`text-[10px] flex-shrink-0 ${priCls(d.priority)}`}>{d.priority}</Badge>
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                    <CalendarIcon className="w-3 h-3" />
+                    <CalendarIcon className="w-3 h-3 text-orange-500" />
                     {new Date(d.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
                   </span>
-                  <span className="text-[10px] text-indigo-500 dark:text-indigo-400 font-medium truncate max-w-[80px]">{d.bigTask}</span>
                 </div>
               </div>
             )) : (
               <div className="text-center py-8">
                 <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <p className="text-xs text-slate-400 dark:text-slate-500">No pending deadlines!</p>
-                <p className="text-[11px] text-slate-300 dark:text-slate-600 mt-1">Sub-tasks assigned to you will appear here.</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500">No pressing deadlines!</p>
               </div>
             )}
             <Button variant="ghost" size="sm" className="w-full text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-xl gap-1 mt-1" onClick={() => navigate("/tasks")}>
@@ -303,47 +379,56 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* Activity feed */}
-      <Card className="border-border bg-white dark:bg-slate-900 shadow-sm">
+      {/* Activity feed (Dinamis dari Backend) */}
+      <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div>
               <CardTitle className="flex items-center gap-2 text-base text-slate-900 dark:text-slate-50"><Activity className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />Recent Activity</CardTitle>
-              <CardDescription className="dark:text-slate-400">Latest updates from {team.name}</CardDescription>
+              <CardDescription className="dark:text-slate-400">Latest updates from {activeTeam}</CardDescription>
             </div>
-            <Button variant="ghost" size="sm" className="gap-1 text-indigo-600 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-950/50 rounded-xl text-xs" onClick={() => navigate("/activity")}>
-              See All <ChevronRight className="w-3 h-3" />
-            </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4 overflow-x-auto pb-1">
-            {MOCK_ACTIVITY.map((a) => (
-              <div key={a.id} className="flex items-start gap-3 min-w-[240px] p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:border-indigo-100 dark:hover:border-indigo-900 hover:bg-white dark:hover:bg-slate-900 transition-all flex-shrink-0">
-                <ActivityDot type={a.type} />
+          <div className="flex gap-4 overflow-x-auto pb-1 custom-scrollbar">
+            {activities.length > 0 ? activities.map((a, idx) => (
+              <div key={a.log_id || idx} className="flex items-start gap-3 min-w-[280px] p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:border-indigo-100 dark:hover:border-indigo-900 hover:bg-white dark:hover:bg-slate-900 transition-all flex-shrink-0">
+                <ActivityDot type={a.action_type === 'I' || a.action_description?.toLowerCase().includes('start') ? 'started' : 'completed'} />
                 <div className="min-w-0">
-                  <p className="text-xs text-slate-800 dark:text-slate-200"><span className="font-semibold">{a.user}</span> <span className="text-slate-500 dark:text-slate-400">{a.action}</span> <span className="font-medium">"{a.target}"</span></p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">{a.time}</p>
+                  <p className="text-xs text-slate-800 dark:text-slate-200">
+                    <span className="font-semibold">{a.user_full_name || "Sistem"}</span> <span className="text-slate-500 dark:text-slate-400">{a.action_description}</span> <span className="font-medium">"{a.task_title || "Group File"}"</span>
+                  </p>
+                  <p className="text-[11px] text-slate-400 dark:text-slate-500 mt-1">
+                    {new Date(a.audited_time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
                 </div>
               </div>
-            ))}
+            )) : (
+              <div className="flex items-center justify-center w-full py-6 text-slate-500 text-sm">
+                No recent activity in this team.
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Rebalance Modal */}
+      {/* Modal Konfirmasi Rebalance */}
       <Dialog open={rebalanceModal} onOpenChange={setRebalanceModal}>
         <DialogContent className="max-w-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 rounded-2xl border dark:border-slate-800">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl text-slate-900 dark:text-slate-50"><Shuffle className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />Rebalance Preview</DialogTitle>
-            <DialogDescription className="dark:text-slate-400">AI will redistribute tasks to balance workload in <span className="font-semibold text-slate-700 dark:text-slate-300">{team.name}</span></DialogDescription>
+            <DialogDescription className="dark:text-slate-400">AI will redistribute tasks to balance workload in <span className="font-semibold text-slate-700 dark:text-slate-300">{activeTeam}</span></DialogDescription>
           </DialogHeader>
           <div className="space-y-5 py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
             <div className="space-y-3">
               <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300">From (Overloaded)</h4>
               <div className="p-4 rounded-xl border border-red-200 bg-red-50/50 dark:border-red-900/40 dark:bg-red-950/20">
                 <div className="flex items-center gap-4">
-                  <Avatar className="w-12 h-12 border border-red-100 dark:border-red-900"><AvatarFallback className="bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 font-semibold">{overloaded?.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback></Avatar>
+                  <Avatar className="w-12 h-12 border border-red-100 dark:border-red-900">
+                    <AvatarFallback className="bg-white dark:bg-slate-800 text-red-600 dark:text-red-400 font-semibold">
+                      {overloaded?.name ? overloaded.name.split(" ").map((n: string) => n[0]).join("") : "U"}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1">
                     <p className="font-semibold text-slate-900 dark:text-slate-100">{overloaded?.name}</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Current: <span className="text-red-600 dark:text-red-400 font-medium">{overloaded?.workload}%</span> → Target: <span className="text-green-600 dark:text-green-400 font-medium">45%</span></p>
@@ -356,7 +441,11 @@ export function Dashboard() {
               <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300">To (Available Capacity)</h4>
               <div className="p-4 rounded-xl border border-green-200 bg-green-50/50 dark:border-green-900/40 dark:bg-green-950/20">
                 <div className="flex items-center gap-4">
-                  <Avatar className="w-12 h-12 border border-green-100 dark:border-green-900"><AvatarFallback className="bg-white dark:bg-slate-800 text-green-600 dark:text-green-400 font-semibold">{under?.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback></Avatar>
+                  <Avatar className="w-12 h-12 border border-green-100 dark:border-green-900">
+                    <AvatarFallback className="bg-white dark:bg-slate-800 text-green-600 dark:text-green-400 font-semibold">
+                      {under?.name ? under.name.split(" ").map((n: string) => n[0]).join("") : "U"}
+                    </AvatarFallback>
+                  </Avatar>
                   <div className="flex-1">
                     <p className="font-semibold text-slate-900 dark:text-slate-100">{under?.name}</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400">Current: <span className="text-blue-600 dark:text-blue-400 font-medium">{under?.workload}%</span> → Target: <span className="text-green-600 dark:text-green-400 font-medium">42%</span></p>
@@ -367,8 +456,10 @@ export function Dashboard() {
             </div>
           </div>
           <DialogFooter className="gap-3 sm:gap-0">
-            <Button variant="outline" onClick={() => setRebalanceModal(false)} className="rounded-xl border dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</Button>
-            <Button className="bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-xl shadow-md px-6 dark:shadow-none" onClick={() => setRebalanceModal(false)}>Confirm Rebalance</Button>
+            <Button variant="outline" onClick={() => setRebalanceModal(false)} disabled={isRebalancing} className="rounded-xl border dark:border-slate-800 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</Button>
+            <Button className="bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-xl shadow-md px-6 dark:shadow-none min-w-[140px]" disabled={isRebalancing} onClick={handleConfirmRebalance}>
+              {isRebalancing ? <Loader2 className="w-4 h-4 animate-spin" /> : "Confirm Rebalance"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

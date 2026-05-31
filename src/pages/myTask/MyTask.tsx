@@ -1,11 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
-import {
-  CheckCircle2, Circle, Clock, Flag, Search, Inbox, UploadCloud, FileText, X, Link as LinkIcon
-} from "lucide-react";
-
+import { CheckCircle2, Circle, Clock, Flag, Search, Inbox, UploadCloud, FileText, X, Link as LinkIcon, Loader2, Eye, Download } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
-import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
 import { Label } from "../../components/ui/label";
@@ -15,7 +11,6 @@ import { format } from "date-fns";
 
 const API = "http://localhost:3000/api";
 
-// ─── Types ───────────────────────────────────────────────────
 interface MyTask {
   id: number;
   taskId: number;
@@ -28,7 +23,6 @@ interface MyTask {
   category: string;
 }
 
-// ✅ Fungsi aman untuk format tanggal
 function safeFormat(dateStr: any, fmt: string) {
   if (!dateStr) return "No date";
   const d = new Date(dateStr);
@@ -36,9 +30,8 @@ function safeFormat(dateStr: any, fmt: string) {
 }
 
 export function MyTasks() {
-  const { activeTeam } = useOutletContext<{ activeTeam: string }>();
+  const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
 
-  // Ambil ID User yang sedang login
   const storedUser = localStorage.getItem("user");
   const currentUser = storedUser ? JSON.parse(storedUser) : null;
   const currentUserId = currentUser?.UserID || currentUser?.user_id || currentUser?.id || null;
@@ -47,7 +40,6 @@ export function MyTasks() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
 
-  // ─── Fetch Tasks dari Backend ───
   const fetchMyTasks = useCallback(async () => {
     if (!currentUserId) return;
     setLoading(true);
@@ -59,15 +51,14 @@ export function MyTasks() {
       });
       const json = await res.json();
       if (json.status === "sukses") {
-        // Normalisasi data dari database agar cocok dengan UI React
         const formattedTasks: MyTask[] = (json.data || []).map((t: any) => ({
           id: t.DetailTaskId || t.detail_task_id,
           taskId: t.TaskId || t.task_id,
           title: t.DetailTaskName || t.detail_task_name,
-          bigTaskTitle: `Task #${t.TaskId || t.task_id}`, // Fallback nama task besar
+          bigTaskTitle: `Task #${t.TaskId || t.task_id}`,
           team: activeTeam || "Your Team",
           deadline: t.DetailTaskDeadline || t.detail_task_deadline,
-          priority: "medium", // Default priority
+          priority: "medium",
           status: t.DetailTaskStatus || t.detail_task_status || "todo",
           category: "task",
         }));
@@ -84,55 +75,143 @@ export function MyTasks() {
     fetchMyTasks();
   }, [fetchMyTasks]);
 
-  // ─── Update Status ke Backend ───
+  // ✅ INI ADALAH SATU-SATUNYA BAGIAN YANG DITAMBAHKAN (Activity Logger)
   const updateTaskStatus = async (detailTaskId: number, newStatus: string) => {
     try {
-      // Update UI langsung biar terasa cepat (Optimistic UI Update)
       setMyTasks(prev => prev.map(t => t.id === detailTaskId ? { ...t, status: newStatus as any } : t));
       
+      // 1. Update status tugas di database
       await fetch(`${API}/detailTaskUpdateStatus`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ detail_task_id: detailTaskId, new_status: newStatus }),
       });
-      // Panggil fetch lagi untuk memastikan sinkron dengan DB
+
+      // 2. Tembak Riwayat ke Activity Log secara diam-diam!
+      const task = myTasks.find(t => t.id === detailTaskId);
+      if (task) {
+        const actionType = newStatus === "in-progress" ? "I" : "C";
+        const actionDesc = newStatus === "in-progress" ? "started" : "completed";
+        await fetch(`${API}/activityCreate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            task_id: task.taskId, 
+            user_id: currentUserId,
+            action_type: actionType,
+            action_description: `${actionDesc} "${task.title}"` 
+          })
+        });
+      }
+
       fetchMyTasks();
     } catch (err) {
       console.error("Gagal update status:", err);
     }
   };
 
-  // ─── State Modal Submit (Tetap Sama Seperti Gayamu) ───
+  // State Modal Submit
   const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
   const [submittingTask, setSubmittingTask] = useState<MyTask | null>(null);
   const [submissionLink, setSubmissionLink] = useState("");
-  const [submissionFile, setSubmissionFile] = useState<string | null>(null);
+  const [submissionFile, setSubmissionFile] = useState<File | null>(null);
+  const [submissionCategory, setSubmissionCategory] = useState("document");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeTab, setActiveTab] = useState("link");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // STATE BARU UNTUK MODAL PREVIEW/VIEW FILE
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewingTask, setViewingTask] = useState<MyTask | null>(null);
+  const [viewingFiles, setViewingFiles] = useState<any[]>([]);
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false);
 
   const openSubmitDialog = (task: MyTask) => {
     setSubmittingTask(task);
     setSubmissionLink("");
     setSubmissionFile(null);
+    setSubmissionCategory("document");
     setSubmitDialogOpen(true);
   };
 
-  const confirmSubmit = () => {
-    if (!submittingTask) return;
-    
-    // Nanti logika simpan file/link bisa diarahkan ke backend
-    // Untuk sekarang, kita langsung update status task jadi completed
-    updateTaskStatus(submittingTask.id, "completed");
-    setSubmitDialogOpen(false);
-    setSubmittingTask(null);
+  // FUNGSI BARU UNTUK BUKA MODAL PREVIEW
+  const openViewDialog = async (task: MyTask) => {
+    setViewingTask(task);
+    setViewDialogOpen(true);
+    setIsLoadingFiles(true);
+    setViewingFiles([]);
+
+    const currentTeam = teams?.find((t: any) => t.name === activeTeam);
+    const groupId = currentTeam?.id;
+
+    if (groupId) {
+      try {
+        const res = await fetch(`${API}/getTaskFilesByGroup`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ group_id: groupId })
+        });
+        const json = await res.json();
+        if (json.status === "sukses") {
+          // Menyaring agar hanya memunculkan file milik task yang di-klik
+          const filesForThisTask = (json.data || []).filter(
+            (f: any) => String(f.detail_task_id) === String(task.id)
+          );
+          setViewingFiles(filesForThisTask);
+        }
+      } catch (err) {
+        console.error("Gagal fetch files untuk preview:", err);
+      }
+    }
+    setIsLoadingFiles(false);
   };
 
-  const getPriorityColor = (p: string) => {
-    const m: Record<string, string> = {
-      high: "bg-red-500/10 text-red-500 border-red-500/20",
-      medium: "bg-amber-500/10 text-amber-500 border-amber-500/20",
-      low: "bg-blue-500/10 text-blue-500 border-blue-500/20",
-    };
-    return m[p] ?? "";
+  const confirmSubmit = async () => {
+    if (!submittingTask || !currentUserId) return;
+    
+    const currentTeam = teams?.find((t: any) => t.name === activeTeam);
+    const groupId = currentTeam?.id;
+
+    if (!groupId) {
+      alert("Error: Tidak dapat menemukan ID Tim.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      if (activeTab === "file" && submissionFile) {
+        const formData = new FormData();
+        formData.append("file", submissionFile);
+        formData.append("detail_task_id", String(submittingTask.id));
+        formData.append("uploaded_by", String(currentUserId));
+        formData.append("group_id", String(groupId));
+        formData.append("file_category", submissionCategory); 
+
+        const res = await fetch(`${API}/insertTaskFile`, {
+          method: "POST",
+          body: formData, 
+        });
+        
+        const json = await res.json();
+        if (json.status !== "sukses") {
+           alert("Gagal upload file: " + json.pesan);
+           setIsSubmitting(false);
+           return;
+        }
+      } 
+      
+      await updateTaskStatus(submittingTask.id, "completed");
+      setSubmitDialogOpen(false);
+      setSubmittingTask(null);
+      setSubmissionFile(null);
+      
+    } catch (err) {
+      console.error("Error submit work:", err);
+      alert("Terjadi kesalahan sistem saat mengirim data.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getStatusIcon = (s: string) => {
@@ -142,35 +221,29 @@ export function MyTasks() {
   };
 
   const filtered = (status?: string) => {
-    let list = status 
-      ? myTasks.filter((t) => (status === "completed" ? (t.status === "completed" || t.status === "C") : t.status === status)) 
-      : myTasks;
+    let list = status ? myTasks.filter((t) => (status === "completed" ? (t.status === "completed" || t.status === "C") : t.status === status)) : myTasks;
     if (search.trim()) list = list.filter((t) => t.title.toLowerCase().includes(search.toLowerCase()));
     return list;
   };
 
-  const total = myTasks.length;
-  const inProgress = myTasks.filter((t) => t.status === "in-progress").length;
-  const completed = myTasks.filter((t) => t.status === "completed" || t.status === "C").length;
-
   const TaskCard = ({ task, showActions = true }: { task: MyTask; showActions?: boolean }) => (
-    <Card className={`border-border bg-card shadow-sm hover:shadow-md transition-shadow ${(task.status === "completed" || task.status === "C") ? "opacity-60" : ""}`}>
+    <Card className={`border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow ${(task.status === "completed" || task.status === "C") ? "opacity-60" : ""}`}>
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           {getStatusIcon(task.status)}
           <div className="flex-1 space-y-2">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h3 className={`font-medium ${(task.status === "completed" || task.status === "C") ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                <h3 className={`font-medium ${(task.status === "completed" || task.status === "C") ? "line-through text-slate-500" : "text-slate-900 dark:text-slate-100"}`}>
                   {task.title}
                 </h3>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   From: <span className="font-medium text-indigo-500 dark:text-indigo-400">{task.bigTaskTitle}</span> · {task.team}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+            <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 flex-wrap">
               <span className="flex items-center gap-1">
                 <Flag className="w-4 h-4" />
                 {safeFormat(task.deadline, "MMM dd, yyyy")}
@@ -180,12 +253,23 @@ export function MyTasks() {
             {showActions && task.status !== "completed" && task.status !== "C" && (
               <div className="flex flex-wrap gap-2 pt-1">
                 {task.status !== "in-progress" && (
-                  <Button size="sm" variant="outline" onClick={() => updateTaskStatus(task.id, "in-progress")}>
+                  <Button size="sm" variant="outline" className="dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" onClick={() => updateTaskStatus(task.id, "in-progress")}>
                     Start
                   </Button>
                 )}
-                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" onClick={() => openSubmitDialog(task)}>
+                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white border-none" onClick={() => openSubmitDialog(task)}>
                   Complete
+                </Button>
+              </div>
+            )}
+
+            {/* TOMBOL VIEW WORK HANYA MUNCUL JIKA TASK COMPLETED */}
+            {showActions && (task.status === "completed" || task.status === "C") && (
+              <div className="flex flex-wrap gap-2 pt-1 mt-1">
+                <Button size="sm" variant="outline" 
+                  className="border-indigo-200 text-indigo-600 dark:border-indigo-800 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30" 
+                  onClick={() => openViewDialog(task)}>
+                  <Eye className="w-4 h-4 mr-1.5" /> View Work
                 </Button>
               </div>
             )}
@@ -198,18 +282,18 @@ export function MyTasks() {
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div>
-        <h1 className="text-3xl font-semibold text-foreground mb-1">My Tasks</h1>
-        <p className="text-muted-foreground">
-          Sub-tasks assigned to you in <span className="font-semibold text-blue-500">{activeTeam}</span>
+        <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-50 mb-1">My Tasks</h1>
+        <p className="text-slate-500 dark:text-slate-400">
+          Sub-tasks assigned to you in <span className="font-semibold text-indigo-500">{activeTeam}</span>
         </p>
       </div>
 
       <div className="flex gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
           <Input
             placeholder="Search your tasks..."
-            className="pl-10 rounded-xl bg-card text-foreground border-border"
+            className="pl-10 rounded-xl bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-50 border-slate-200 dark:border-slate-800"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -217,28 +301,28 @@ export function MyTasks() {
       </div>
 
       {loading ? (
-        <div className="flex justify-center py-10"><p>Loading your tasks...</p></div>
-      ) : total === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-border rounded-2xl bg-card">
+        <div className="flex justify-center py-10 text-slate-500"><p>Loading your tasks...</p></div>
+      ) : myTasks.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl bg-white dark:bg-slate-900/50">
           <div className="w-14 h-14 rounded-full bg-indigo-500/10 flex items-center justify-center mb-4">
             <Inbox className="w-7 h-7 text-indigo-500" />
           </div>
-          <h3 className="font-semibold text-xl text-foreground mb-1">No tasks assigned yet</h3>
-          <p className="text-sm text-muted-foreground text-center max-w-xs">
+          <h3 className="font-semibold text-xl text-slate-900 dark:text-slate-50 mb-1">No tasks assigned yet</h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400 text-center max-w-xs">
             Sub-tasks assigned to you via <span className="font-medium text-indigo-500">AI Breakdown</span> will appear here.
           </p>
         </div>
       ) : (
         <Tabs defaultValue="all" className="space-y-4">
-          <TabsList className="bg-muted rounded-xl p-1 border border-border">
-            <TabsTrigger value="all" className="rounded-lg">All ({total})</TabsTrigger>
-            <TabsTrigger value="todo" className="rounded-lg">To Do ({myTasks.filter(t=>t.status==="todo").length})</TabsTrigger>
-            <TabsTrigger value="in-progress" className="rounded-lg">In Progress ({inProgress})</TabsTrigger>
-            <TabsTrigger value="completed" className="rounded-lg">Completed ({completed})</TabsTrigger>
+          <TabsList className="bg-slate-100 dark:bg-slate-800/50 rounded-xl p-1">
+            <TabsTrigger value="all" className="rounded-lg dark:data-[state=active]:bg-slate-700">All ({myTasks.length})</TabsTrigger>
+            <TabsTrigger value="todo" className="rounded-lg dark:data-[state=active]:bg-slate-700">To Do ({myTasks.filter(t=>t.status==="todo").length})</TabsTrigger>
+            <TabsTrigger value="in-progress" className="rounded-lg dark:data-[state=active]:bg-slate-700">In Progress ({myTasks.filter(t=>t.status==="in-progress").length})</TabsTrigger>
+            <TabsTrigger value="completed" className="rounded-lg dark:data-[state=active]:bg-slate-700">Completed ({myTasks.filter(t=>t.status==="completed" || t.status==="C").length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="all" className="space-y-3">
-            {filtered().length === 0 ? <p className="text-center text-muted-foreground py-8">No tasks found.</p> : filtered().map((t) => <TaskCard key={t.id} task={t} />)}
+            {filtered().map((t) => <TaskCard key={t.id} task={t} />)}
           </TabsContent>
           <TabsContent value="todo" className="space-y-3">
             {filtered("todo").map((t) => <TaskCard key={t.id} task={t} />)}
@@ -247,13 +331,12 @@ export function MyTasks() {
             {filtered("in-progress").map((t) => <TaskCard key={t.id} task={t} />)}
           </TabsContent>
           <TabsContent value="completed" className="space-y-3">
-            {filtered("completed").map((t) => <TaskCard key={t.id} task={t} showActions={false} />)}
+            {filtered("completed").map((t) => <TaskCard key={t.id} task={t} showActions={true} />)}
           </TabsContent>
         </Tabs>
       )}
 
-      {/* Dialog Submit Work */}
-      {/* Dialog Submit Work */}
+      {/* MODAL SUBMIT WORK */}
       <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
         <DialogContent className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 sm:max-w-md text-slate-900 dark:text-slate-50">
           <DialogHeader>
@@ -276,7 +359,7 @@ export function MyTasks() {
                   <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input
                     placeholder="e.g. https://github.com/..."
-                    className="rounded-xl pl-9 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-50 focus-visible:ring-indigo-500"
+                    className="rounded-xl pl-9 bg-white dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus-visible:ring-indigo-500"
                     value={submissionLink}
                     onChange={(e) => setSubmissionLink(e.target.value)}
                   />
@@ -285,22 +368,113 @@ export function MyTasks() {
             </TabsContent>
             
             <TabsContent value="file" className="space-y-4 py-2">
-              <div className="space-y-2">
-                <Label>Document File</Label>
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-slate-300 dark:border-slate-700 border-dashed rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                  <UploadCloud className="w-8 h-8 text-slate-400 mb-2" />
-                  <p className="text-sm text-slate-500 dark:text-slate-400"><span className="font-semibold text-indigo-500">Click to upload</span></p>
-                </label>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Document File</Label>
+                  <input 
+                    type="file" 
+                    className="hidden" 
+                    ref={fileInputRef}
+                    onChange={(e) => e.target.files && setSubmissionFile(e.target.files[0])}
+                  />
+                  {!submissionFile ? (
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex flex-col items-center justify-center w-full h-24 border-2 border-slate-300 dark:border-slate-700 border-dashed rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    >
+                      <UploadCloud className="w-8 h-8 text-slate-400 mb-2" />
+                      <p className="text-sm text-slate-500 dark:text-slate-400"><span className="font-semibold text-indigo-500">Click to upload</span></p>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20">
+                      <div className="flex items-center gap-3 overflow-hidden">
+                        <FileText className="w-5 h-5 text-indigo-500 shrink-0" />
+                        <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{submissionFile.name}</span>
+                      </div>
+                      <Button variant="ghost" size="icon" onClick={() => setSubmissionFile(null)} className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30">
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <select
+                    className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3 py-2.5 text-sm text-slate-900 dark:text-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={submissionCategory}
+                    onChange={(e) => setSubmissionCategory(e.target.value)}
+                  >
+                    <option value="design">Design</option>
+                    <option value="document">Document</option>
+                    <option value="code">Code</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
               </div>
             </TabsContent>
           </Tabs>
 
           <DialogFooter className="mt-4">
-            <Button variant="outline" onClick={() => setSubmitDialogOpen(false)} className="rounded-xl border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800">
+            <Button variant="outline" onClick={() => setSubmitDialogOpen(false)} disabled={isSubmitting} className="rounded-xl border-slate-200 dark:border-slate-700">
               Cancel
             </Button>
-            <Button onClick={confirmSubmit} className="rounded-xl bg-green-600 hover:bg-green-700 text-white border-none">
-              Submit & Complete
+            <Button 
+              onClick={confirmSubmit} 
+              disabled={isSubmitting || (activeTab === "link" ? !submissionLink.trim() : !submissionFile)}
+              className="rounded-xl bg-green-600 hover:bg-green-700 text-white border-none min-w-[140px]"
+            >
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Submit & Complete"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL BARU: VIEW SUBMITTED WORK */}
+      <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
+        <DialogContent className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 sm:max-w-md text-slate-900 dark:text-slate-50">
+          <DialogHeader>
+            <DialogTitle>Submitted Work</DialogTitle>
+            <DialogDescription className="text-slate-500 dark:text-slate-400">
+              Files attached for <span className="font-semibold text-slate-900 dark:text-slate-100">"{viewingTask?.title}"</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-4 min-h-[100px]">
+            {isLoadingFiles ? (
+              <div className="flex flex-col items-center justify-center py-6">
+                <Loader2 className="w-6 h-6 animate-spin text-indigo-500 mb-2" />
+                <p className="text-sm text-slate-500">Checking attachments...</p>
+              </div>
+            ) : viewingFiles.length > 0 ? (
+              viewingFiles.map((file) => (
+                <div key={file.file_id} className="flex items-center justify-between p-3 border border-slate-200 dark:border-slate-700 rounded-xl bg-slate-50 dark:bg-slate-950">
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <FileText className="w-5 h-5 text-indigo-500 shrink-0" />
+                    <span className="text-sm font-medium text-slate-700 dark:text-slate-200 truncate">{file.file_name}</span>
+                  </div>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => window.open(file.file_url, '_blank')} 
+                    className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-100 dark:text-indigo-400 dark:hover:bg-indigo-900/50 rounded-lg"
+                  >
+                    <Download className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-slate-500 dark:text-slate-400">
+                <Inbox className="w-10 h-10 mb-2 opacity-20" />
+                <p className="text-sm font-medium">No files attached</p>
+                <p className="text-xs">User only clicked Complete or submitted a link.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setViewDialogOpen(false)} className="rounded-xl border-slate-200 dark:border-slate-700">
+              Close
             </Button>
           </DialogFooter>
         </DialogContent>

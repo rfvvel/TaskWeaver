@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
-import { File, FileText, Image, FileCode, Download, Eye, MoreVertical, Search, Filter, FolderOpen, Trash2 } from "lucide-react";
+import { useOutletContext } from "react-router-dom";
+import { File, FileText, Image, FileCode, Download, Eye, MoreVertical, Search, Filter, FolderOpen, Trash2, Loader2 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -23,59 +24,106 @@ interface FileItem {
   uploadDate: string;
   status: string;
   category: string;
+  url: string; 
 }
 
 export function Files() {
+  const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
+  
   const [files, setFiles] = useState<FileItem[]>([]);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const fetchFiles = () => {
-      const stored = localStorage.getItem("tw_files");
-      if (stored) {
-        setFiles(JSON.parse(stored));
+    const fetchFiles = async () => {
+      const currentTeam = teams?.find((t: any) => t.name === activeTeam);
+      const groupId = currentTeam?.id;
+      
+      if (!groupId) {
+        setFiles([]);
+        return;
+      }
+
+      setLoading(true);
+      try {
+        const res = await fetch("http://localhost:3000/api/getTaskFilesByGroup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ group_id: groupId })
+        });
+        
+        const json = await res.json();
+        if (json.status === "sukses") {
+          const mappedFiles = (json.data || []).map((dbFile: any) => ({
+            id: dbFile.file_id,
+            name: dbFile.file_name,
+            type: dbFile.file_category || "document", 
+            size: "Unknown", 
+            owner: dbFile.uploader_name || "Unknown User",
+            avatar: dbFile.uploader_name || "U",
+            uploadDate: new Date(dbFile.upload_time).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            status: "Uploaded",
+            category: dbFile.file_category || "other",
+            url: dbFile.file_url 
+          }));
+          
+          setFiles(mappedFiles);
+        }
+      } catch (err) {
+        console.error("Gagal menarik data file:", err);
+      } finally {
+        setLoading(false);
       }
     };
+    
     fetchFiles();
+  }, [activeTeam, teams]);
 
-    window.addEventListener("storage", fetchFiles);
-    return () => window.removeEventListener("storage", fetchFiles);
-  }, []);
+  // ✅ FUNGSI BARU UNTUK HAPUS FILE INDIVIDU KE BACKEND
+  const handleDeleteFile = async (fileId: string | number, fileName: string) => {
+    if (!window.confirm(`Apakah kamu yakin ingin menghapus file "${fileName}"?`)) return;
 
-  const handleDeleteAll = () => {
-    if (window.confirm("Apakah kamu yakin ingin menghapus semua file? Aksi ini tidak bisa dibatalkan.")) {
-      localStorage.removeItem("tw_files");
-      setFiles([]);
+    try {
+      const res = await fetch("http://localhost:3000/api/deleteTaskFile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_id: fileId })
+      });
+      
+      const json = await res.json();
+      if (json.status === "sukses") {
+        // Hapus file dari tampilan layar secara instan
+        setFiles(prev => prev.filter(f => f.id !== fileId));
+      } else {
+        alert("Gagal menghapus file: " + json.pesan);
+      }
+    } catch (err) {
+      console.error("Gagal menghapus file:", err);
+      alert("Terjadi kesalahan pada server saat menghapus file.");
     }
+  };
+
+  const handleDownload = (url: string) => {
+    if (url) window.open(url, '_blank');
   };
 
   const getFileIcon = (type: string) => {
     switch (type) {
-      case "design":
-        return <File className="w-8 h-8 text-purple-600 dark:text-purple-400" />;
-      case "document":
-        return <FileText className="w-8 h-8 text-blue-600 dark:text-blue-400" />;
-      case "code":
-        return <FileCode className="w-8 h-8 text-green-600 dark:text-green-400" />;
-      case "image":
-        return <Image className="w-8 h-8 text-pink-600 dark:text-pink-400" />;
-      default:
-        return <File className="w-8 h-8 text-muted-foreground" />;
+      case "design": return <File className="w-8 h-8 text-purple-600 dark:text-purple-400" />;
+      case "document": return <FileText className="w-8 h-8 text-blue-600 dark:text-blue-400" />;
+      case "code": return <FileCode className="w-8 h-8 text-green-600 dark:text-green-400" />;
+      case "image": return <Image className="w-8 h-8 text-pink-600 dark:text-pink-400" />;
+      default: return <File className="w-8 h-8 text-muted-foreground" />;
     }
   };
 
   const getFileBackground = (type: string) => {
     switch (type) {
-      case "design":
-        return "bg-purple-50 dark:bg-purple-950/20 border-purple-100 dark:border-purple-900/50";
-      case "document":
-        return "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/50";
-      case "code":
-        return "bg-green-50 dark:bg-green-950/20 border-green-100 dark:border-green-900/50";
-      case "image":
-        return "bg-pink-50 dark:bg-pink-950/20 border-pink-100 dark:border-pink-900/50";
-      default:
-        return "bg-muted border-border";
+      case "design": return "bg-purple-50 dark:bg-purple-950/20 border-purple-100 dark:border-purple-900/50";
+      case "document": return "bg-blue-50 dark:bg-blue-950/20 border-blue-100 dark:border-blue-900/50";
+      case "code": return "bg-green-50 dark:bg-green-950/20 border-green-100 dark:border-green-900/50";
+      case "image": return "bg-pink-50 dark:bg-pink-950/20 border-pink-100 dark:border-pink-900/50";
+      default: return "bg-muted border-border";
     }
   };
 
@@ -86,6 +134,14 @@ export function Files() {
   const categoriesCount = new Set(files.map(f => f.category)).size;
 
   const FileGrid = ({ data }: { data: FileItem[] }) => {
+    if (loading) {
+      return (
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+        </div>
+      );
+    }
+
     if (data.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center py-16 border-2 border-dashed border-border rounded-2xl bg-muted/30">
@@ -118,21 +174,37 @@ export function Files() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="bg-card border-border text-foreground">
-                        <DropdownMenuItem className="hover:bg-accent"><Eye className="w-4 h-4 mr-2" />Preview</DropdownMenuItem>
-                        <DropdownMenuItem className="hover:bg-accent"><Download className="w-4 h-4 mr-2" />Download</DropdownMenuItem>
+                        <DropdownMenuItem className="hover:bg-accent cursor-pointer" onClick={() => handleDownload(file.url)}>
+                          <Eye className="w-4 h-4 mr-2" />Preview
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="hover:bg-accent cursor-pointer" onClick={() => handleDownload(file.url)}>
+                          <Download className="w-4 h-4 mr-2" />Download
+                        </DropdownMenuItem>
+                        
+                        {/* ✅ TOMBOL DELETE KHUSUS FILE INI */}
+                        <DropdownMenuItem 
+                          className="hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 cursor-pointer focus:text-red-600"
+                          onClick={() => handleDeleteFile(file.id, file.name)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />Delete
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
 
                   <div className="flex items-center justify-between">
                     <span className="text-xs text-muted-foreground">{file.size}</span>
-                    <Badge variant="secondary" className="text-[10px] font-normal capitalize bg-muted text-muted-foreground border-0">{file.category}</Badge>
+                    <Badge variant="secondary" className="text-[10px] font-normal capitalize bg-muted text-muted-foreground border-0">
+                      {file.category}
+                    </Badge>
                   </div>
 
                   <div className="flex items-center gap-2 pt-2 border-t border-border">
                     <Avatar className="w-6 h-6">
                       <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${file.avatar}`} />
-                      <AvatarFallback className="text-xs bg-muted text-muted-foreground">{file.owner.charAt(0)}</AvatarFallback>
+                      <AvatarFallback className="text-xs font-bold bg-indigo-100 text-indigo-700">
+                        {file.owner.charAt(0).toUpperCase()}
+                      </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-muted-foreground truncate">{file.owner}</p>
@@ -152,7 +224,7 @@ export function Files() {
     <div className="p-6 space-y-6 max-w-7xl mx-auto bg-background text-foreground">
       <div>
         <h1 className="text-3xl font-semibold text-foreground mb-1">Files</h1>
-        <p className="text-muted-foreground">Team file repository and document management</p>
+        <p className="text-muted-foreground">Team file repository for <span className="font-semibold text-indigo-500">{activeTeam}</span></p>
       </div>
 
       {/* Stats Cards */}
@@ -197,13 +269,6 @@ export function Files() {
         <Button variant="outline" className="gap-2 rounded-xl bg-card border-border text-foreground hover:bg-accent">
           <Filter className="w-4 h-4" />
           Filter
-        </Button>
-        <Button 
-          onClick={handleDeleteAll}
-          className="gap-2 bg-red-600 hover:bg-red-700 text-white rounded-xl shadow-sm"
-        >
-          <Trash2 className="w-4 h-4" />
-          Delete
         </Button>
       </div>
 
