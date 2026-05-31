@@ -15,6 +15,13 @@ interface BigTask { id: string; title: string; status: "todo" | "in-progress" | 
 interface TeamMember { id: string; name: string; email: string; role: "admin" | "member"; avatarSeed: string; joinDate: string; }
 interface Team { id: string; name: string; description: string; inviteCode: string; members: TeamMember[]; bigTasks: BigTask[]; }
 
+// ✅ Fungsi untuk memformat tanggal agar cantik (misal: "May 31, 2026")
+const formatDate = (dateStr: string) => {
+  if (!dateStr) return "No Date";
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? "Invalid Date" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+};
+
 export function TeamManagement() {
   const navigate = useNavigate();
   
@@ -60,37 +67,54 @@ export function TeamManagement() {
         if (response.ok && result.status === "sukses") {
           const teamsWithMembers = await Promise.all(result.data.map(async (g: any) => {
             let membersList: TeamMember[] = [];
+            let bigTasksList: BigTask[] = []; // ✅ Wadah untuk task besar
             
+            // 1. Ambil Data Members
             try {
               const memRes = await fetch("http://localhost:3000/api/groupGetMember", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ group_id: g.group_id })
               });
-              
               const memData = await memRes.json();
               
               if (memRes.ok && memData.status === "sukses") {
-                membersList = memData.data.map((m: any) => {
-                    // Log ini akan muncul di F12 Console untuk melihat struktur data yang sebenarnya
-                    console.log("Data member mentah:", m); 
-                    
-                    return {
-                        id: String(m.user_id),
-                        name: m.user_full_name || m.name || "Unknown User", 
-                        email: m.user_email || "No Email",
-                        role: m.user_role === 'A' ? "admin" : "member",
-                        avatarSeed: m.user_full_name || "U",
-                        joinDate: m.join_date || "Joined recently"
-                    };
-                });
+                membersList = memData.data.map((m: any) => ({
+                    id: String(m.user_id),
+                    name: m.user_full_name || m.name || "Unknown User", 
+                    email: m.user_email || "No Email",
+                    role: m.user_role === 'A' ? "admin" : "member",
+                    avatarSeed: m.user_full_name || "U",
+                    joinDate: m.join_date || "Joined recently"
+                }));
               }
             } catch (e) {
               console.error(`Gagal mengambil member untuk grup ${g.group_id}`, e);
             }
 
-            let inviteCode = g.group_invite_code || g.group_invitecode || g.invite_code || null;
+            // 2. ✅ Ambil Data Big Tasks dari Database
+            try {
+              const taskRes = await fetch("http://localhost:3000/api/taskGetByGroup", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ Group_Id: g.group_id })
+              });
+              const taskData = await taskRes.json();
+              
+              if (taskRes.ok && taskData.status === "sukses" && taskData.data) {
+                bigTasksList = taskData.data.map((t: any) => ({
+                  id: String(t.task_id || t.TaskId),
+                  title: t.task_title || t.TaskName,
+                  status: t.task_status || t.status || "todo",
+                  deadline: t.deadline || t.TaskDeadline
+                }));
+              }
+            } catch (e) {
+              console.error(`Gagal mengambil task untuk grup ${g.group_id}`, e);
+            }
 
+            // 3. Ambil Data Invite Code
+            let inviteCode = g.group_invite_code || g.group_invitecode || g.invite_code || null;
             if (!inviteCode) {
               try {
                 const invRes = await fetch("http://localhost:3000/api/groupGetInviteCode", {
@@ -116,7 +140,7 @@ export function TeamManagement() {
               description: g.group_description || "No description provided.",
               inviteCode: inviteCode || "No invite code",
               members: membersList,
-              bigTasks: []
+              bigTasks: bigTasksList 
             };
           }));
 
@@ -128,7 +152,7 @@ export function TeamManagement() {
           }
         }
       } catch (error) {
-        console.error("❌ Gagal memproses data workspace:", error);
+        console.error("Gagal memproses data workspace:", error);
       }
     };
 
@@ -136,10 +160,18 @@ export function TeamManagement() {
   }, []);
 
   const openTeamTasks = (team: Team) => { setSelectedTeam(team); setTaskDialogOpen(true); };
-  const goToTaskManagement = () => { setTaskDialogOpen(false); navigate("/task-management"); };
+  
+  // ✅ Perbaikan: Navigate ke task management dan set active team
+  const goToTaskManagement = (teamName: string) => { 
+    setActiveTeam(teamName);
+    localStorage.setItem("tw_activeTeam", teamName);
+    setTaskDialogOpen(false); 
+    navigate("/task-management"); 
+  };
 
   const handleCreateTaskForTeam = (teamName: string) => {
     setActiveTeam(teamName);
+    localStorage.setItem("tw_activeTeam", teamName);
     setTaskDialogOpen(false);
     navigate("/task-management");
   };
@@ -190,7 +222,7 @@ export function TeamManagement() {
         alert(result.pesan || "Gagal keluar dari tim.");
       }
     } catch (error) {
-      console.error("❌ Error Leave Team:", error);
+      console.error("Error Leave Team:", error);
       alert("Tidak bisa terhubung ke server.");
     }
   };
@@ -215,7 +247,6 @@ export function TeamManagement() {
     setJoinCodeError("");
 
     try {
-      // Step 1: Validasi invite code & ambil group_id
       const resCheck = await fetch("http://localhost:3000/api/groupGetGroupbyInviteCode", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -231,7 +262,6 @@ export function TeamManagement() {
 
       const groupId = resultCheck.data.group_id || resultCheck.data.id;
 
-      // Step 2: Join group
       const resJoin = await fetch("http://localhost:3000/api/groupJoin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -243,7 +273,6 @@ export function TeamManagement() {
         setJoinDialogOpen(false);
         setInviteCodeInput("");
         setJoinCodeError("");
-        // Refresh daftar tim
         window.location.reload();
       } else {
         setJoinCodeError(resultJoin.pesan || "Gagal bergabung ke tim.");
@@ -378,7 +407,7 @@ export function TeamManagement() {
 
       {/* Big Tasks Dialog */}
       <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
-        <DialogContent className="rounded-2xl max-w-lg bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
+        <DialogContent className="rounded-2xl max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           {selectedTeam && (
             <>
               <DialogHeader>
@@ -388,20 +417,22 @@ export function TeamManagement() {
                   </div>
                   {selectedTeam.name} - Big Tasks
                 </DialogTitle>
-                <DialogDescription className="dark:text-slate-400">Klik salah satu tugas untuk masuk ke Task Management.</DialogDescription>
+                <DialogDescription className="dark:text-slate-400">Click on a task to enter Task Management.</DialogDescription>
               </DialogHeader>
               <div className="mt-4 grid gap-3">
                 {selectedTeam.bigTasks.map((task) => (
-                  <Card key={task.id} onClick={goToTaskManagement} className="p-4 cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all group bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800">
+                  <Card key={task.id} onClick={() => goToTaskManagement(selectedTeam.name)} className="p-4 cursor-pointer hover:border-blue-400 dark:hover:border-blue-500 hover:shadow-md transition-all group bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800">
                     <div className="flex items-center gap-3">
                       {task.status === 'completed' ? <CheckCircle2 className="w-5 h-5 text-green-500 shrink-0" /> : task.status === 'in-progress' ? <Clock className="w-5 h-5 text-blue-500 shrink-0" /> : <Circle className="w-5 h-5 text-slate-300 dark:text-slate-600 shrink-0" />}
                       <div className="flex-1">
                         <h4 className="font-semibold text-slate-900 dark:text-slate-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{task.title}</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Due: {task.deadline}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Due: {formatDate(task.deadline)}</p>
                       </div>
                     </div>
                   </Card>
                 ))}
+                
+                {/* Tampilan jika task kosong */}
                 {selectedTeam.bigTasks.length === 0 && (
                   <div className="text-center py-10 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center">
                     <ClipboardList className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-3" />

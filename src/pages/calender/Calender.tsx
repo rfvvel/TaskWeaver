@@ -3,111 +3,162 @@ import { useOutletContext } from "react-router-dom";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
-import { Badge } from "../../components/ui/badge";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 
-interface SubTask { id: string; title: string; assignedTo: string; avatarSeed: string; status: string; }
-interface Task { id: string; team: string; title: string; difficulty: string; dueDate: string; assignedTo: string | null; status: string; subtasks: SubTask[]; }
+interface CalendarEvent {
+  id: string;
+  title: string;
+  dueDate: string;
+  assignedTo: string;
+  status: string;
+  userId: string | number; // ✅ Tambahan wadah untuk ID User
+}
 
 export function Calendar() {
-  const { activeTeam } = useOutletContext<{ activeTeam: string }>();
-  const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [baseDate, setBaseDate] = useState(new Date());
-  const [view, setView] = useState<"week" | "month">("week");
 
+  // ✅ 1. Ambil ID User yang sedang login (seperti di MyTasks)
+  const storedUser = localStorage.getItem("user");
+  const currentUser = storedUser ? JSON.parse(storedUser) : null;
+  const currentUserId = currentUser?.UserID || currentUser?.user_id || currentUser?.id || null;
+
+  const currentTeam = teams?.find((t: any) => t.name === activeTeam);
+  const groupId = currentTeam?.id;
+
+  // 2. Fetch data Sub-task lalu saring berdasarkan User Login
   useEffect(() => {
-    const fetchTasks = () => {
-      const stored = localStorage.getItem("tw_tasks");
-      if (stored) setAllTasks(JSON.parse(stored));
+    const fetchEvents = async () => {
+      // Jika tidak ada tim yang dipilih atau user belum login, kosongkan kalender
+      if (!groupId || !currentUserId) {
+         setEvents([]);
+         return;
+      }
+      try {
+        const res = await fetch("http://localhost:3000/api/detailTaskGetByGroup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ group_id: groupId })
+        });
+        const json = await res.json();
+        
+        if (json.status === "sukses") {
+          const mapped = (json.data || [])
+            .map((item: any) => ({
+              id: item.detail_task_id || item.DetailTaskId,
+              title: item.detail_task_name || item.DetailTaskName,
+              dueDate: item.detail_task_deadline || item.DetailTaskDeadline,
+              assignedTo: item.user_full_name || item.UserFullName || item.assigned_user_name || "Unassigned",
+              status: item.detail_task_status || item.DetailTaskStatus || "todo",
+              userId: item.user_id || item.UserId // Ambil ID pemilik tugas
+            }))
+            // ✅ FILTER SAKTI: Hanya sisakan tugas yang ID-nya cocok dengan currentUserId
+            .filter((item: CalendarEvent) => String(item.userId) === String(currentUserId));
+            
+          setEvents(mapped);
+        }
+      } catch (e) {
+        console.error("Gagal fetch data calendar:", e);
+      }
     };
-    fetchTasks();
-    window.addEventListener("storage", fetchTasks);
-    return () => window.removeEventListener("storage", fetchTasks);
-  }, []);
+    fetchEvents();
+  }, [groupId, activeTeam, currentUserId]);
 
-  const teamTasks = allTasks.filter(t => t.team === activeTeam);
-
-  const handlePrevWeek = () => {
+  const handlePrevMonth = () => {
     const newDate = new Date(baseDate);
-    newDate.setDate(newDate.getDate() - 7);
+    newDate.setMonth(newDate.getMonth() - 1);
     setBaseDate(newDate);
   };
 
-  const handleNextWeek = () => {
+  const handleNextMonth = () => {
     const newDate = new Date(baseDate);
-    newDate.setDate(newDate.getDate() + 7);
+    newDate.setMonth(newDate.getMonth() + 1);
     setBaseDate(newDate);
   };
 
   const goToToday = () => setBaseDate(new Date());
 
-  const getWeekDays = (date: Date) => {
-    const current = new Date(date);
-    const day = current.getDay();
-    const diff = current.getDate() - day + (day === 0 ? -6 : 1);
-    const monday = new Date(current.setDate(diff));
+  // 3. Logika untuk membuat Grid Kalender Bulan
+  const getMonthDays = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
     
-    const week = [];
+    const firstDay = new Date(year, month, 1).getDay(); 
+    const daysInMonth = new Date(year, month + 1, 0).getDate(); 
+    
+    const days = [];
     const todayStr = new Date().toDateString();
 
-    for (let i = 0; i < 7; i++) {
-      const nextDate = new Date(monday);
-      nextDate.setDate(monday.getDate() + i);
-      
-      const yyyy = nextDate.getFullYear();
-      const mm = String(nextDate.getMonth() + 1).padStart(2, '0');
-      const dd = String(nextDate.getDate()).padStart(2, '0');
-      const dateStr = `${yyyy}-${mm}-${dd}`;
-      
-      const dayTasks = teamTasks.filter(t => t.dueDate.startsWith(dateStr));
+    for (let i = 0; i < firstDay; i++) {
+      days.push(null);
+    }
 
-      week.push({
-        date: nextDate.getDate(),
-        day: nextDate.toLocaleDateString("en-US", { weekday: "short" }),
-        fullDate: dateStr,
-        isToday: nextDate.toDateString() === todayStr,
+    for (let i = 1; i <= daysInMonth; i++) {
+      const currentDate = new Date(year, month, i);
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
+      
+      // ✅ Logika kebal timezone
+      const dayTasks = events.filter(t => {
+        if (!t.dueDate) return false;
+        const d = new Date(t.dueDate);
+        return d.getFullYear() === year && d.getMonth() === month && d.getDate() === i;
+      });
+
+      days.push({
+        date: i,
+        fullDate: dateStr, 
+        isToday: currentDate.toDateString() === todayStr,
         tasks: dayTasks.map(t => ({
           id: t.id,
           title: t.title,
-          time: "11:59 PM",
-          member: t.assignedTo || "Unassigned",
-          color: t.status === "completed" ? "bg-green-600 dark:bg-green-700" : "bg-indigo-600 dark:bg-indigo-700"
+          member: t.assignedTo,
+          color: (t.status === "completed" || t.status === "C") ? "bg-green-600 dark:bg-green-700" : "bg-indigo-500 dark:bg-indigo-600"
         }))
       });
     }
-    return week;
+    return days;
   };
 
-  const currentWeekDays = getWeekDays(baseDate);
+  const currentMonthDays = getMonthDays(baseDate);
   const currentMonthLabel = baseDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-  const weekStart = currentWeekDays[0].date;
-  const weekEnd = currentWeekDays[6].date;
-  const weekMonth = baseDate.toLocaleDateString("en-US", { month: "short" });
+  const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-  const todayISO = new Date().toISOString().split('T')[0];
-  const upcomingTasks = teamTasks
-    .filter(t => t.status !== "completed" && t.dueDate >= todayISO)
+  // 4. Logika Upcoming Deadlines (Max 7 Hari ke depan dari Hari Ini)
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); 
+  const nextWeek = new Date(today);
+  nextWeek.setDate(today.getDate() + 7);
+
+  const upcomingTasks = events
+    .filter(t => {
+      if (t.status === "completed" || t.status === "C") return false;
+      if (!t.dueDate) return false;
+      
+      const d = new Date(t.dueDate);
+      return d >= today && d <= nextWeek;
+    })
     .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
-    .slice(0, 5);
+    .slice(0, 5); 
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-foreground mb-1">Calendar</h1>
-          <p className="text-muted-foreground">Manage deadlines for <span className="font-semibold text-indigo-500 dark:text-indigo-400">{activeTeam}</span></p>
+          <p className="text-muted-foreground">Manage your deadlines in <span className="font-semibold text-indigo-500 dark:text-indigo-400">{activeTeam}</span></p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={goToToday} className="rounded-xl mr-2 text-indigo-600 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900 hover:bg-indigo-50 dark:hover:bg-indigo-950">
             Today
           </Button>
-          <Button variant="outline" size="icon" className="rounded-xl" onClick={handlePrevWeek}>
+          <Button variant="outline" size="icon" className="rounded-xl" onClick={handlePrevMonth}>
             <ChevronLeft className="w-4 h-4" />
           </Button>
           <div className="px-4 py-2 bg-card border border-border rounded-xl min-w-[160px] text-center shadow-sm">
             <p className="font-medium text-foreground">{currentMonthLabel}</p>
           </div>
-          <Button variant="outline" size="icon" className="rounded-xl" onClick={handleNextWeek}>
+          <Button variant="outline" size="icon" className="rounded-xl" onClick={handleNextMonth}>
             <ChevronRight className="w-4 h-4" />
           </Button>
         </div>
@@ -118,70 +169,64 @@ export function Calendar() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>This Week</CardTitle>
-                <CardDescription>{weekMonth} {weekStart} - {weekEnd}, {baseDate.getFullYear()}</CardDescription>
+                <CardDescription>{currentMonthLabel} Schedule</CardDescription>
               </div>
-              <Button 
-                variant="outline" 
-                className="gap-2 rounded-xl"
-                onClick={() => setView(view === "week" ? "month" : "week")}
-              >
-                <CalendarIcon className="w-4 h-4" />
-                {view === "week" ? "Month View" : "Week View"}
-              </Button>
             </div>
           </CardHeader>
           <CardContent>
-            {view === "week" ? (
-              <div className="grid grid-cols-7 gap-2">
-                {currentWeekDays.map((day, idx) => (
+            <div className="grid grid-cols-7 gap-2 mb-2">
+              {WEEKDAYS.map(day => (
+                <div key={day} className="text-center text-xs font-bold text-muted-foreground uppercase">{day}</div>
+              ))}
+            </div>
+            <div className="grid grid-cols-7 gap-2">
+              {currentMonthDays.map((day, idx) => {
+                if (!day) return <div key={`empty-${idx}`} className="p-3 rounded-xl border border-transparent min-h-[100px]" />;
+                
+                return (
                   <div 
                     key={idx} 
-                    className={`p-3 rounded-xl border ${
+                    className={`p-2 rounded-xl border ${
                       day.isToday 
                         ? 'border-indigo-500 bg-gradient-to-br from-indigo-50/50 to-cyan-50/50 dark:from-indigo-950/30 dark:to-cyan-950/30 ring-1 ring-indigo-200 dark:ring-indigo-800' 
-                        : 'border-border bg-muted/40'
-                    } hover:shadow-md transition-all min-h-[140px] flex flex-col`}
+                        : 'border-border bg-muted/20'
+                    } hover:shadow-md transition-all min-h-[100px] flex flex-col`}
                   >
-                    <div className="text-center mb-3">
-                      <p className="text-xs text-muted-foreground font-medium mb-1">{day.day}</p>
-                      <div className={`w-8 h-8 mx-auto rounded-full flex items-center justify-center ${
+                    <div className="text-center mb-1.5">
+                      <div className={`w-6 h-6 mx-auto rounded-full flex items-center justify-center text-xs ${
                         day.isToday 
                           ? 'bg-indigo-600 text-white font-bold shadow-sm' 
-                          : 'text-foreground font-semibold'
+                          : 'text-foreground font-medium'
                       }`}>
                         {day.date}
                       </div>
                     </div>
-                    <div className="space-y-1.5 flex-1 overflow-y-auto max-h-[120px] custom-scrollbar">
+                    <div className="space-y-1 overflow-y-auto max-h-[70px] custom-scrollbar">
                       {day.tasks.map((task, i) => (
                         <div 
                           key={`${task.id}-${i}`} 
-                          className={`${task.color} text-white px-2 py-1.5 rounded-md cursor-pointer hover:opacity-90 transition-opacity shadow-sm`}
-                          title={`${task.title} - Assigned to ${task.member}`}
+                          className={`${task.color} text-white px-1.5 py-1 rounded cursor-pointer hover:opacity-90 transition-opacity shadow-sm`}
+                          title={`${task.title}`}
                         >
-                          <p className="text-[11px] font-medium truncate leading-tight">{task.title}</p>
+                          <p className="text-[10px] font-medium truncate leading-tight">{task.title}</p>
                         </div>
                       ))}
                     </div>
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="py-10 text-center border-2 border-dashed border-border rounded-xl">
-                <CalendarIcon className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-              </div>
-            )}
+                );
+              })}
+            </div>
           </CardContent>
         </Card>
 
+        {/* Kolom Kanan: Upcoming Deadlines */}
         <Card className="border-border shadow-sm bg-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Clock className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
               Upcoming Deadlines
             </CardTitle>
-            <CardDescription>Pending tasks closest to deadline</CardDescription>
+            <CardDescription>Your tasks due in the next 7 days</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {upcomingTasks.length > 0 ? upcomingTasks.map((event) => (
@@ -189,16 +234,6 @@ export function Calendar() {
                 <div className="space-y-2">
                   <div className="flex items-start justify-between gap-2">
                     <h4 className="font-medium text-sm text-foreground flex-1 leading-snug">{event.title}</h4>
-                    <Badge 
-                      variant="outline"
-                      className={`text-[10px] ${
-                        event.difficulty === "expert" || event.difficulty === "hard" ? "bg-red-500/10 text-red-500 border-red-500/20" :
-                        event.difficulty === "medium" ? "bg-amber-500/10 text-amber-500 border-amber-500/20" :
-                        "bg-green-500/10 text-green-500 border-green-500/20"
-                      }`}
-                    >
-                      {event.difficulty}
-                    </Badge>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <CalendarIcon className="w-3 h-3 text-indigo-500 dark:text-indigo-400" />
@@ -207,7 +242,7 @@ export function Calendar() {
                   <div className="flex items-center gap-2 pt-1">
                     <Avatar className="w-5 h-5 border border-background shadow-sm">
                       <AvatarFallback className="text-[9px] bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 font-bold">
-                        {(event.assignedTo || "Unassigned").charAt(0)}
+                        {(event.assignedTo || "U").charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <span className="text-[11px] font-medium text-muted-foreground">{event.assignedTo || "Unassigned"}</span>
@@ -220,7 +255,7 @@ export function Calendar() {
                   <Clock className="w-6 h-6 text-green-500" />
                 </div>
                 <p className="text-sm font-medium text-foreground">Clear Schedule!</p>
-                <p className="text-xs text-muted-foreground mt-1">No upcoming deadlines for {activeTeam}.</p>
+                <p className="text-xs text-muted-foreground mt-1">You have no upcoming deadlines in 7 days.</p>
               </div>
             )}
           </CardContent>

@@ -18,7 +18,7 @@ type LoginFormInputs = z.infer<typeof loginSchema>;
 function AnimatedBackground() {
   return (
     <>
-      {/* Gradient Background */}
+
       <div
         className="absolute inset-0"
         style={{
@@ -158,13 +158,9 @@ export default function LoginPage() {
   return (
     <div className="relative min-h-screen overflow-hidden flex flex-col justify-center items-center p-4">
 
-      {/* Animated Background */}
       <AnimatedBackground />
-
-      {/* Main Content */}
       <div className="relative z-10 w-full flex flex-col items-center">
 
-        {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-5">
           <img
             src={LogoTW2}
