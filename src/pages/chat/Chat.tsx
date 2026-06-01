@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef } from "react";
+
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import {
-  Send, Hash, Users, UserPlus, Plus, Trash2, AlertCircle,
+  Send, Hash, Users, UserPlus, Plus, Trash2, AlertCircle, Pencil, Check, X,
 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -20,190 +21,297 @@ import {
   AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
   AlertDialogTrigger,
 } from "../../components/ui/alert-dialog";
-
+import { channelApi, chatApi } from "../../api/chatApi";
+import type { ApiChannel, ApiChat } from "../../api/chatApi";
+ 
 // ─── Types ────────────────────────────────────────────────────────────────────
-
+ 
 interface TeamMember {
-  id: string;
+  id?: string;       // alias untuk user_id
+  user_id: string;   // field asli dari backend
   name: string;
   email: string;
   role: "admin" | "member";
   avatarSeed: string;
   joinDate: string;
 }
-
+ 
 interface Team {
-  id: string;
+  id: string;   // = group_id di backend
   name: string;
   description: string;
   inviteCode: string;
   members: TeamMember[];
   bigTasks: unknown[];
 }
-
-interface Message {
-  id: string;
-  user: string;
-  message: string;
-  time: string;
-  isOwn: boolean;
-}
-
+ 
 interface Channel {
-  id: string;
+  id: string;       // channel_id
   name: string;
   isPrivate: boolean;
   isDefault: boolean;
 }
-
-const SEED_CHANNELS: Channel[] = [];
-
+ 
+interface Message {
+  id: string;       // chat_id
+  userId: string;   // user_id — untuk cek isOwn & operasi edit/delete
+  user: string;     // user_full_name
+  message: string;
+  time: string;
+  isOwn: boolean;
+}
+ 
 const STATUS_CYCLE = ["online", "online", "away", "online", "offline"] as const;
-
+ 
+// ─── Converters ───────────────────────────────────────────────────────────────
+ 
+const toChannel = (a: ApiChannel): Channel => ({
+  id: a.channel_id,
+  name: a.channel_name,
+  isPrivate: false,
+  isDefault: false,
+});
+ 
+const toMessage = (a: ApiChat, currentUserId: string): Message => ({
+  id: a.chat_id,
+  userId: a.user_id,
+  user: a.user_full_name ?? "Unknown",
+  message: a.chat_message,
+  time: a.audited_time
+    ? new Date(a.audited_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : "",
+  isOwn: a.user_id === currentUserId,
+});
+ 
 // ─── Component ────────────────────────────────────────────────────────────────
-
+ 
 export function Chat() {
   const navigate = useNavigate();
-  const { activeTeam, teams } = useOutletContext<{
+ 
+  // currentUser ditambahkan di Layout.tsx — berisi id & name dari localStorage
+  const { activeTeam, teams, currentUser } = useOutletContext<{
     activeTeam: string;
     teams: Team[];
+    currentUser: { id: string; name: string };
   }>();
-
+ 
   const activeTeamData = teams.find((t) => t.name === activeTeam);
   const members: TeamMember[] = activeTeamData?.members ?? [];
-
+  const groupId = activeTeamData?.id ?? "";   // group_id untuk semua API call
+  const userId  = currentUser?.id ?? "";      // user_id untuk semua API call
+ 
   // ── State ──────────────────────────────────────────────────────────────────
-
-  const [teamChannels, setTeamChannels] = useState<Record<string, Channel[]>>({});
-  const [allMessages, setAllMessages] = useState<Record<string, Record<string, Message[]>>>({});
-  const [activeChannelId, setActiveChannelId] = useState<Record<string, string>>({});
-  const [message, setMessage] = useState("");
-
+ 
+  const [channels,         setChannels]         = useState<Channel[]>([]);
+  const [messages,         setMessages]         = useState<Message[]>([]);
+  const [activeChannelId,  setActiveChannelId]  = useState<string>("");
+  const [message,          setMessage]          = useState("");
+ 
+  // Loading & error
+  const [loadingChannels, setLoadingChannels] = useState(false);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  const [sendingMsg,      setSendingMsg]      = useState(false);
+  const [apiError,        setApiError]        = useState<string | null>(null);
+ 
+  // Create channel
   const [createOpen,  setCreateOpen]  = useState(false);
   const [channelName, setChannelName] = useState("");
   const [nameError,   setNameError]   = useState("");
-
+  const [creatingCh,  setCreatingCh]  = useState(false);
+ 
+  // Edit message
+  const [editingMsgId,   setEditingMsgId]   = useState<string | null>(null);
+  const [editingMsgText, setEditingMsgText] = useState("");
+  const [savingEdit,     setSavingEdit]     = useState(false);
+ 
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // ── Derived ────────────────────────────────────────────────────────────────
-
-  const channels: Channel[] = teamChannels[activeTeam] ?? SEED_CHANNELS;
-  const currentChannelId: string = activeChannelId[activeTeam] ?? channels[0]?.id ?? "";
-  const selectedChannel: Channel = channels.find((c) => c.id === currentChannelId) ?? channels[0];
-  const currentMessages: Message[] = allMessages[activeTeam]?.[currentChannelId] ?? [];
-
-  // ── Effects ────────────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    if (!teamChannels[activeTeam]) {
-      setTeamChannels((prev) => ({ ...prev, [activeTeam]: SEED_CHANNELS }));
+ 
+  const selectedChannel = channels.find((c) => c.id === activeChannelId);
+ 
+  // ── Fetch channels ─────────────────────────────────────────────────────────
+ 
+  const fetchChannels = useCallback(async () => {
+    if (!groupId) return;
+    setLoadingChannels(true);
+    setApiError(null);
+    try {
+      const res = await channelApi.getByGroup(groupId);
+      const list = (res.data ?? []).map(toChannel);
+      setChannels(list);
+      // Tetap di channel yang sama jika masih ada, kalau tidak ambil yang pertama
+      setActiveChannelId((prev) =>
+        list.find((c) => c.id === prev) ? prev : list[0]?.id ?? ""
+      );
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : "Gagal memuat channel");
+    } finally {
+      setLoadingChannels(false);
     }
-  }, [activeTeam]);
-
+  }, [groupId]);
+ 
+  useEffect(() => {
+    setChannels([]);
+    setMessages([]);
+    setActiveChannelId("");
+    fetchChannels();
+  }, [fetchChannels]);
+ 
+  // ── Fetch messages ─────────────────────────────────────────────────────────
+ 
+  const fetchMessages = useCallback(async () => {
+    if (!groupId || !activeChannelId) return;
+    setLoadingMessages(true);
+    try {
+      const res = await chatApi.getByChannel(groupId, activeChannelId);
+      setMessages((res.data ?? []).map((m) => toMessage(m, userId)));
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : "Gagal memuat pesan");
+    } finally {
+      setLoadingMessages(false);
+    }
+  }, [groupId, activeChannelId, userId]);
+ 
+  useEffect(() => {
+    setMessages([]);
+    fetchMessages();
+  }, [fetchMessages]);
+ 
+  // ── Auto scroll ────────────────────────────────────────────────────────────
+ 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [currentMessages]);
-
+  }, [messages]);
+ 
   // ── Helpers ────────────────────────────────────────────────────────────────
-
+ 
   const statusColor = (idx: number) => {
     const s = STATUS_CYCLE[idx % STATUS_CYCLE.length];
     return s === "online" ? "bg-green-500" : s === "away" ? "bg-yellow-500" : "bg-gray-400";
   };
-
   const statusLabel = (idx: number) => STATUS_CYCLE[idx % STATUS_CYCLE.length];
-
-  const initials = (name: string) =>
+  const initials    = (name: string) =>
     name.split(" ").map((n) => n[0]).join("").toUpperCase();
-
-  const slugify = (s: string) =>
+  const slugify     = (s: string) =>
     s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
-
-  const setActiveChannelIdWrapper = (ch: Channel) =>
-    setActiveChannelId((prev) => ({ ...prev, [activeTeam]: ch.id }));
-
+ 
   // ── Send message ───────────────────────────────────────────────────────────
-
-  const handleSend = () => {
-    if (!message.trim() || !selectedChannel) return;
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      user: "You",
+ 
+  const handleSend = async () => {
+    if (!message.trim() || !selectedChannel || !groupId || !userId) return;
+    setSendingMsg(true);
+ 
+    // Optimistic update agar UI terasa cepat
+    const optimistic: Message = {
+      id: `opt-${Date.now()}`,
+      userId,
+      user: currentUser?.name ?? "You",
       message: message.trim(),
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       isOwn: true,
     };
-    setAllMessages((prev) => ({
-      ...prev,
-      [activeTeam]: {
-        ...prev[activeTeam],
-        [currentChannelId]: [...(prev[activeTeam]?.[currentChannelId] ?? []), newMsg],
-      },
-    }));
+    setMessages((prev) => [...prev, optimistic]);
     setMessage("");
+ 
+    try {
+      await chatApi.send(groupId, userId, activeChannelId, optimistic.message);
+      // Refresh untuk dapat chat_id asli dari server
+      await fetchMessages();
+    } catch (err: unknown) {
+      // Rollback jika gagal
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      setApiError(err instanceof Error ? err.message : "Gagal mengirim pesan");
+    } finally {
+      setSendingMsg(false);
+    }
   };
-
+ 
+  // ── Edit message ───────────────────────────────────────────────────────────
+ 
+  const startEdit = (msg: Message) => {
+    setEditingMsgId(msg.id);
+    setEditingMsgText(msg.message);
+  };
+  const cancelEdit = () => { setEditingMsgId(null); setEditingMsgText(""); };
+ 
+  const handleSaveEdit = async (msg: Message) => {
+    if (!editingMsgText.trim() || editingMsgText === msg.message) { cancelEdit(); return; }
+    setSavingEdit(true);
+    try {
+      await chatApi.update(msg.id, userId, editingMsgText.trim());
+      setMessages((prev) =>
+        prev.map((m) => m.id === msg.id ? { ...m, message: editingMsgText.trim() } : m)
+      );
+      cancelEdit();
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : "Gagal mengupdate pesan");
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+ 
+  // ── Delete message ─────────────────────────────────────────────────────────
+ 
+  const handleDeleteMessage = async (msg: Message) => {
+    try {
+      await chatApi.delete(msg.id, userId);
+      setMessages((prev) => prev.filter((m) => m.id !== msg.id));
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : "Gagal menghapus pesan");
+    }
+  };
+ 
   // ── Create channel ─────────────────────────────────────────────────────────
-
-  const handleCreateChannel = () => {
+ 
+  const handleCreateChannel = async () => {
     const trimmedInput = channelName.trim();
-    if (!trimmedInput) { 
-      setNameError("Channel name cannot be empty."); 
-      return; 
-    }
-
-    const wordCount = trimmedInput.split(/\s+/).length;
-    if (wordCount > 3) {
-      setNameError("Maximum limit is 3 words.");
-      return;
-    }
-
+    if (!trimmedInput) { setNameError("Channel name cannot be empty."); return; }
+    if (trimmedInput.split(/\s+/).length > 3) { setNameError("Maximum limit is 3 words."); return; }
     const slug = slugify(channelName);
-    if (channels.some((c) => c.name === slug)) {
-      setNameError(`#${slug} already exists in this team.`);
-      return;
+    if (channels.some((c) => c.name === slug)) { setNameError(`#${slug} already exists.`); return; }
+ 
+    // Guard: pastikan session valid sebelum hit API
+    if (!groupId) { setNameError("No active team selected. Please select a team first."); return; }
+    if (!userId)  { setNameError("Session expired. Please log in again."); return; }
+ 
+    setCreatingCh(true);
+    try {
+      await channelApi.create(groupId, userId, slug);
+      await fetchChannels();
+      setCreateOpen(false);
+      setChannelName("");
+      setNameError("");
+    } catch (err: unknown) {
+      setNameError(err instanceof Error ? err.message : "Gagal membuat channel");
+    } finally {
+      setCreatingCh(false);
     }
-
-    const newCh: Channel = {
-      id: `c-${Date.now()}`,
-      name: slug,
-      isPrivate: false,
-      isDefault: false,
-    };
-    setTeamChannels((prev) => ({
-      ...prev,
-      [activeTeam]: [...(prev[activeTeam] ?? []), newCh],
-    }));
-    setActiveChannelId((prev) => ({ ...prev, [activeTeam]: newCh.id }));
-    setCreateOpen(false);
-    setChannelName("");
-    setNameError("");
   };
-
+ 
   // ── Delete channel ─────────────────────────────────────────────────────────
-
-  const handleDeleteChannel = (ch: Channel) => {
-    const updated = channels.filter((c) => c.id !== ch.id);
-    setTeamChannels((prev) => ({ ...prev, [activeTeam]: updated }));
-    if (ch.id === currentChannelId && updated.length > 0) {
-      setActiveChannelId((prev) => ({ ...prev, [activeTeam]: updated[0].id }));
-    } else if (updated.length === 0) {
-      setActiveChannelId((prev) => ({ ...prev, [activeTeam]: "" }));
+ 
+  const handleDeleteChannel = async (ch: Channel) => {
+    try {
+      await channelApi.delete(ch.id, groupId, userId);
+      await fetchChannels();
+    } catch (err: unknown) {
+      setApiError(err instanceof Error ? err.message : "Gagal menghapus channel");
     }
   };
-
+ 
+  // ── No teams guard ─────────────────────────────────────────────────────────
+ 
   if (teams.length === 0) {
     return (
       <div className="p-6 h-[calc(100vh-8rem)] flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="flex flex-col items-center text-center max-w-sm">
-          <div className="relative mb-6">
-            <div className="w-24 h-24 rounded-full bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center">
-              <Users className="w-12 h-12 text-indigo-300 dark:text-indigo-700" />
-            </div>
+          <div className="w-24 h-24 rounded-full bg-indigo-50 dark:bg-indigo-950/40 flex items-center justify-center mb-6">
+            <Users className="w-12 h-12 text-indigo-300 dark:text-indigo-700" />
           </div>
-          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">You haven't joined any team yet</h2>
+          <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+            You haven't joined any team yet
+          </h2>
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
             Join or create a team first, then you can start discussing in channels.
           </p>
@@ -217,10 +325,23 @@ export function Chat() {
       </div>
     );
   }
-
+ 
+  // ── Render ─────────────────────────────────────────────────────────────────
+ 
   return (
     <div className="p-6 bg-slate-50 dark:bg-slate-950 min-h-screen">
-
+ 
+      {/* ── Error banner ── */}
+      {apiError && (
+        <div className="mb-3 flex items-center gap-2 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm px-4 py-2.5 rounded-xl">
+          <AlertCircle className="w-4 h-4 shrink-0" />
+          <span className="flex-1">{apiError}</span>
+          <button onClick={() => setApiError(null)}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+ 
       {/* ── Create Channel Dialog ── */}
       <Dialog open={createOpen} onOpenChange={(open) => {
         setCreateOpen(open);
@@ -233,21 +354,21 @@ export function Chat() {
               Channels are where your team communicates. Keep them focused on a topic.
             </DialogDescription>
           </DialogHeader>
-
+ 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="ch-name">Channel Name</Label>
               <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm select-none">
-                  #
-                </span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-medium text-sm select-none">#</span>
                 <Input
                   id="ch-name"
                   placeholder="e.g. backend api design"
                   value={channelName}
                   onChange={(e) => { setChannelName(e.target.value); if (nameError) setNameError(""); }}
                   onKeyDown={(e) => e.key === "Enter" && handleCreateChannel()}
-                  className={`rounded-xl pl-7 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800 ${nameError ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+                  className={`rounded-xl pl-7 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white border-slate-200 dark:border-slate-800 ${
+                    nameError ? "border-red-400 focus-visible:ring-red-400" : ""
+                  }`}
                 />
               </div>
               {nameError ? (
@@ -261,34 +382,38 @@ export function Chat() {
               )}
             </div>
           </div>
-
+ 
           <DialogFooter className="gap-2 sm:gap-0">
-            <Button variant="outline" onClick={() => setCreateOpen(false)} className="rounded-xl border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <Button
+              variant="outline"
+              onClick={() => setCreateOpen(false)}
+              className="rounded-xl border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+            >
               Cancel
             </Button>
             <Button
               onClick={handleCreateChannel}
-              disabled={!channelName.trim()}
+              disabled={!channelName.trim() || creatingCh}
               className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 text-white disabled:opacity-40"
             >
-              Create Channel
+              {creatingCh ? "Creating…" : "Create Channel"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
+ 
       {/* ── Main Card ── */}
       <Card className="border-slate-200 dark:border-slate-800 shadow-sm h-[calc(100vh-8rem)] bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
         <CardContent className="p-0 h-full">
           <div className="flex h-full">
-
+ 
             {/* ── Left: Channels Sidebar ── */}
             <div className="w-60 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 bg-white dark:bg-slate-900">
               <div className="p-4 border-b border-slate-200 dark:border-slate-800">
                 <h2 className="text-sm font-bold truncate">{activeTeam}</h2>
                 <p className="text-xs text-slate-400 mt-0.5">{members.length} members</p>
               </div>
-
+ 
               <ScrollArea className="flex-1">
                 <div className="p-2">
                   <div className="flex items-center justify-between px-3 pt-2 pb-1">
@@ -302,125 +427,210 @@ export function Chat() {
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
-
-                  <div className="space-y-0.5">
-                    {channels.map((ch) => {
-                      const isActive = ch.id === currentChannelId;
-                      return (
-                        /* KUNCI UTAMA DI SINI:
-                          w-[224px] & max-w-[224px] membatasi lebar total baris (240px sidebar - padding kiri kanan 16px).
-                        */
-                        <div 
-                          key={ch.id} 
-                          className={`flex items-center justify-between w-[224px] max-w-[224px] p-1 rounded-lg transition-colors gap-1 ${
-                            isActive
-                              ? "bg-gradient-to-r from-indigo-600 to-cyan-500 text-white"
-                              : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
-                          }`}
-                        >
-                          {/* flex-1 dan w-0 memaksa button mengalah saat teks memanjang */}
-                          <button
-                            onClick={() => setActiveChannelIdWrapper(ch)}
-                            className="flex items-center gap-2 px-2 py-1 flex-1 w-0 text-sm text-left"
+ 
+                  {loadingChannels ? (
+                    <p className="text-xs text-slate-400 px-3 py-4 text-center">Loading channels…</p>
+                  ) : (
+                    <div className="space-y-0.5">
+                      {channels.map((ch) => {
+                        const isActive = ch.id === activeChannelId;
+                        return (
+                          <div
+                            key={ch.id}
+                            className={`flex items-center justify-between w-[224px] max-w-[224px] p-1 rounded-lg transition-colors gap-1 ${
+                              isActive
+                                ? "bg-gradient-to-r from-indigo-600 to-cyan-500 text-white"
+                                : "hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300"
+                            }`}
                           >
-                            <Hash className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-white" : "text-slate-400"}`} />
-                            {/* truncate diatur pada block span */}
-                            <span className="block truncate w-full" title={ch.name}>
-                              {ch.name}
-                            </span>
-                          </button>
-
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              {/* shrink-0 mengunci tombol trash agar ukurannya tidak mengecil */}
-                              <button
-                                className={`w-7 h-7 flex items-center justify-center rounded-md transition-all shrink-0 ml-auto ${
-                                  isActive
-                                    ? "text-red-200 hover:text-red-100 hover:bg-white/20" 
-                                    : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
-                                }`}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent className="rounded-2xl max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white shadow-2xl">
-                              <AlertDialogHeader>
-                                <AlertDialogTitle className="text-slate-900 dark:text-white">Delete #{ch.name}?</AlertDialogTitle>
-                                <AlertDialogDescription className="text-slate-500 dark:text-slate-400">
-                                  All messages will be permanently deleted.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter className="gap-2 sm:gap-0">
-                                <AlertDialogCancel className="mt-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors">Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => handleDeleteChannel(ch)}
-                                  className="rounded-xl bg-red-600 hover:bg-red-700 text-white border-none shadow-sm transition-colors"
+                            <button
+                              onClick={() => setActiveChannelId(ch.id)}
+                              className="flex items-center gap-2 px-2 py-1 flex-1 w-0 text-sm text-left"
+                            >
+                              <Hash className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-white" : "text-slate-400"}`} />
+                              <span className="block truncate w-full" title={ch.name}>{ch.name}</span>
+                            </button>
+ 
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <button
+                                  className={`w-7 h-7 flex items-center justify-center rounded-md transition-all shrink-0 ml-auto ${
+                                    isActive
+                                      ? "text-red-200 hover:text-red-100 hover:bg-white/20"
+                                      : "text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
+                                  }`}
                                 >
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </div>
-                      );
-                    })}
-                  </div>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent className="rounded-2xl max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white shadow-2xl">
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle className="text-slate-900 dark:text-white">
+                                    Delete #{ch.name}?
+                                  </AlertDialogTitle>
+                                  <AlertDialogDescription className="text-slate-500 dark:text-slate-400">
+                                    All messages will be permanently deleted.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter className="gap-2 sm:gap-0">
+                                  <AlertDialogCancel className="mt-0 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors">
+                                    Cancel
+                                  </AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => handleDeleteChannel(ch)}
+                                    className="rounded-xl bg-red-600 hover:bg-red-700 text-white border-none shadow-sm transition-colors"
+                                  >
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
             </div>
-
+ 
             {/* ── Center: Chat Area ── */}
             <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 dark:bg-slate-950/20 border-r border-slate-200 dark:border-slate-800">
               {selectedChannel ? (
                 <>
+                  {/* Channel header */}
                   <div className="h-16 border-b border-slate-200 dark:border-slate-800 px-5 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
                     <div className="flex items-center gap-2 min-w-0">
                       <Hash className="w-4 h-4 text-slate-400 shrink-0" />
-                      <div className="min-w-0">
-                        <h3 className="font-semibold truncate">{selectedChannel.name}</h3>
-                      </div>
+                      <h3 className="font-semibold truncate">{selectedChannel.name}</h3>
                     </div>
                   </div>
-
+ 
+                  {/* Messages */}
                   <div ref={scrollRef} className="flex-1 overflow-y-auto p-5">
-                    {currentMessages.length === 0 ? (
+                    {loadingMessages ? (
+                      <div className="flex items-center justify-center h-full">
+                        <p className="text-sm text-slate-400">Loading messages…</p>
+                      </div>
+                    ) : messages.length === 0 ? (
                       <div className="flex flex-col items-center justify-center h-full text-center">
                         <h3 className="font-semibold text-lg">Welcome to #{selectedChannel.name}</h3>
                         <p className="text-sm text-slate-400 mt-1">Send the first message!</p>
                       </div>
                     ) : (
                       <div className="space-y-4">
-                        {currentMessages.map((msg) => (
-                          <div key={msg.id} className={`flex gap-3 ${msg.isOwn ? "flex-row-reverse" : ""}`}>
+                        {messages.map((msg) => (
+                          <div key={msg.id} className={`flex gap-3 group ${msg.isOwn ? "flex-row-reverse" : ""}`}>
                             <Avatar className="w-9 h-9 flex-shrink-0">
                               <AvatarFallback className="text-xs font-semibold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
                                 {initials(msg.user)}
                               </AvatarFallback>
                             </Avatar>
+ 
                             <div className={`flex-1 max-w-[70%] ${msg.isOwn ? "flex flex-col items-end" : ""}`}>
-                              <span className="text-xs text-slate-400 mb-1">{msg.user}</span>
-                              <div className={`inline-block px-4 py-2 rounded-xl text-sm ${
-                                msg.isOwn ? "bg-gradient-to-r from-indigo-600 to-cyan-500 text-white" : "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white"
-                              }`}>
-                                {msg.message}
+                              <div className={`flex items-center gap-2 mb-1 ${msg.isOwn ? "flex-row-reverse" : ""}`}>
+                                <span className="text-xs text-slate-400">{msg.user}</span>
+                                <span className="text-xs text-slate-300 dark:text-slate-600">{msg.time}</span>
                               </div>
+ 
+                              {editingMsgId === msg.id ? (
+                                /* Inline edit input */
+                                <div className="flex items-center gap-2 w-full">
+                                  <Input
+                                    value={editingMsgText}
+                                    onChange={(e) => setEditingMsgText(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter") handleSaveEdit(msg);
+                                      if (e.key === "Escape") cancelEdit();
+                                    }}
+                                    className="rounded-xl text-sm bg-white dark:bg-slate-800 border-indigo-300 dark:border-indigo-700"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleSaveEdit(msg)}
+                                    disabled={savingEdit}
+                                    className="p-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white disabled:opacity-50"
+                                  >
+                                    <Check className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={cancelEdit}
+                                    className="p-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-end gap-1.5 group/bubble">
+                                  {/* Edit & delete — hanya muncul untuk pesan milik sendiri saat hover */}
+                                  {msg.isOwn && (
+                                    <div className="flex gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity mb-0.5">
+                                      <button
+                                        onClick={() => startEdit(msg)}
+                                        className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-indigo-500"
+                                      >
+                                        <Pencil className="w-3 h-3" />
+                                      </button>
+ 
+                                      <AlertDialog>
+                                        <AlertDialogTrigger asChild>
+                                          <button className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-slate-400 hover:text-red-500">
+                                            <Trash2 className="w-3 h-3" />
+                                          </button>
+                                        </AlertDialogTrigger>
+                                        <AlertDialogContent className="rounded-2xl max-w-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white shadow-2xl">
+                                          <AlertDialogHeader>
+                                            <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+                                            <AlertDialogDescription className="text-slate-500 dark:text-slate-400">
+                                              This action cannot be undone.
+                                            </AlertDialogDescription>
+                                          </AlertDialogHeader>
+                                          <AlertDialogFooter>
+                                            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+                                            <AlertDialogAction
+                                              onClick={() => handleDeleteMessage(msg)}
+                                              className="rounded-xl bg-red-600 hover:bg-red-700 text-white"
+                                            >
+                                              Delete
+                                            </AlertDialogAction>
+                                          </AlertDialogFooter>
+                                        </AlertDialogContent>
+                                      </AlertDialog>
+                                    </div>
+                                  )}
+ 
+                                  <div className={`inline-block px-4 py-2 rounded-xl text-sm ${
+                                    msg.isOwn
+                                      ? "bg-gradient-to-r from-indigo-600 to-cyan-500 text-white"
+                                      : "bg-slate-100 dark:bg-slate-800 text-slate-900 dark:text-white"
+                                  }`}>
+                                    {msg.message}
+                                  </div>
+                                </div>
+                              )}
                             </div>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
-
+ 
+                  {/* Input bar */}
                   <div className="p-4 border-t border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
                     <div className="flex items-center gap-2">
                       <Input
                         placeholder={`Message #${selectedChannel.name}`}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
-                        onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                        onKeyDown={(e) => e.key === "Enter" && !sendingMsg && handleSend()}
+                        disabled={sendingMsg}
                         className="rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
                       />
-                      <Button onClick={handleSend} disabled={!message.trim()} className="bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-xl">
+                      <Button
+                        onClick={handleSend}
+                        disabled={!message.trim() || sendingMsg}
+                        className="bg-gradient-to-r from-indigo-600 to-cyan-500 text-white rounded-xl"
+                      >
                         <Send className="w-4 h-4" />
                       </Button>
                     </div>
@@ -430,15 +640,20 @@ export function Chat() {
                 <div className="flex flex-col items-center justify-center h-full text-center p-6">
                   <Hash className="w-12 h-12 text-slate-300 dark:text-slate-700 mb-3" />
                   <h3 className="font-semibold text-lg">No channels available</h3>
-                  <p className="text-sm text-slate-400 mt-1 mb-4">Click the plus icon on the sidebar to create your first channel.</p>
-                  <Button onClick={() => setCreateOpen(true)} className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 text-white gap-1">
+                  <p className="text-sm text-slate-400 mt-1 mb-4">
+                    Click the plus icon on the sidebar to create your first channel.
+                  </p>
+                  <Button
+                    onClick={() => setCreateOpen(true)}
+                    className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 text-white gap-1"
+                  >
                     <Plus className="w-4 h-4" /> Create Channel
                   </Button>
                 </div>
               )}
             </div>
-
-            {/* ── Right Sidebar: Members Panel ── */}
+ 
+            {/* ── Right Sidebar: Members ── */}
             <div className="w-60 flex flex-col shrink-0 bg-white dark:bg-slate-900">
               <div className="p-4 border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-2">
@@ -449,12 +664,10 @@ export function Chat() {
                   </Badge>
                 </div>
               </div>
-
+ 
               <ScrollArea className="flex-1 p-2">
                 {members.length === 0 ? (
-                  <p className="text-center text-xs text-slate-400 py-8">
-                    No members in this team
-                  </p>
+                  <p className="text-center text-xs text-slate-400 py-8">No members in this team</p>
                 ) : (
                   <div className="space-y-1">
                     {(["online", "away", "offline"] as const).map((group) => {
@@ -469,7 +682,7 @@ export function Chat() {
                             const idx = members.indexOf(member);
                             return (
                               <div
-                                key={member.id}
+                                key={member.user_id ?? member.id}
                                 className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
                               >
                                 <div className="relative shrink-0">
@@ -482,7 +695,9 @@ export function Chat() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <p className="text-xs font-medium truncate">{member.name}</p>
-                                  <p className="text-[10px] text-slate-400 capitalize truncate">{member.role}</p>
+                                  <p className="text-[10px] text-slate-400 capitalize truncate">
+                                    {member.role === "admin" ? "Admin" : "Member"}
+                                  </p>
                                 </div>
                               </div>
                             );
@@ -494,10 +709,11 @@ export function Chat() {
                 )}
               </ScrollArea>
             </div>
-
+ 
           </div>
         </CardContent>
       </Card>
     </div>
   );
 }
+ 

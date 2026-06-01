@@ -43,7 +43,6 @@ function TypewriterText({ text }: { text: string }) {
 }
 
 function SplashScreen() {
-  // ✅ CARA INISIALISASI ORIGINAL TEMANMU
   const particlesInit = async (engine: any) => {
     await loadSlim(engine);
   };
