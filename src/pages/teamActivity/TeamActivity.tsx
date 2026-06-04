@@ -1,110 +1,146 @@
-import { Activity, CheckCircle2, Upload, MessageSquare, UserPlus, Clock } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { useOutletContext, useNavigate } from "react-router-dom";
+import { Activity, CheckCircle2, Clock, Loader2, Users } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "../../components/ui/avatar";
+import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Badge } from "../../components/ui/badge";
 import { Progress } from "../../components/ui/progress";
+import { Button } from "../../components/ui/button";
 
-const activities = [
-  {
-    id: 1,
-    user: "Steven Nathaniel",
-    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
-    action: "completed task",
-    target: "Design authentication flow mockups",
-    time: "2 hours ago",
-    type: "completed",
-    progress: 15
-  },
-  {
-    id: 2,
-    user: "Lie Darren",
-    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alex",
-    action: "uploaded file",
-    target: "test-results-final.pdf",
-    time: "3 hours ago",
-    type: "upload"
-  },
-  {
-    id: 3,
-    user: "Evan Varian",
-    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=michael",
-    action: "commented on",
-    target: "API Integration Testing",
-    time: "5 hours ago",
-    type: "comment",
-    comment: "The endpoint is working perfectly now!"
-  },
-  {
-    id: 4,
-    user: "Rafael Wijaya",
-    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emily",
-    action: "started working on",
-    target: "User profile components",
-    time: "6 hours ago",
-    type: "started",
-    progress: 35
-  },
-  {
-    id: 5,
-    user: "Kevin Mahardika",
-    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
-    action: "updated",
-    target: "Project proposal document",
-    time: "1 day ago",
-    type: "update",
-    progress: 80
-  },
-  {
-    id: 6,
-    user: "Steven Nathaniel",
-    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
-    action: "completed task",
-    target: "Create wireframes for dashboard",
-    time: "1 day ago",
-    type: "completed",
-    progress: 22
-  },
-  {
-    id: 7,
-    user: "Lie Darren",
-    // avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=alex",
-    action: "completed task",
-    target: "Set up testing environment",
-    time: "2 days ago",
-    type: "completed",
-    progress: 8
-  },
-];
+const API = "http://localhost:3000/api";
 
-const teamProgress = [
-  { name: "Sarah Chen", avatar: "sarah", tasksCompleted: 12, tasksTotal: 18, progress: 67 },
-  { name: "Michael Rodriguez", avatar: "michael", tasksCompleted: 8, tasksTotal: 15, progress: 53 },
-  { name: "Emily Watson", avatar: "emily", tasksCompleted: 10, tasksTotal: 14, progress: 71 },
-  { name: "David Kim", avatar: "david", tasksCompleted: 6, tasksTotal: 12, progress: 50 },
-  { name: "Alex Johnson", avatar: "alex", tasksCompleted: 9, tasksTotal: 16, progress: 56 },
-];
+// ─── Component Bantuan untuk Icon Activity ────────────────────────────
+function ActivityDot({ type }: { type: string }) {
+  const isStarted = type?.toLowerCase().includes("in-progress") || type?.toLowerCase().includes("start");
+  const isCompleted = type?.toLowerCase().includes("completed") || type?.toLowerCase().includes("c");
+  
+  const bg = isCompleted ? "bg-green-100 dark:bg-green-950/50" : isStarted ? "bg-amber-100 dark:bg-amber-950/50" : "bg-indigo-100 dark:bg-indigo-950/50";
+  const ic = isCompleted ? "text-green-600 dark:text-green-400" : isStarted ? "text-amber-500 dark:text-amber-400" : "text-indigo-500 dark:text-indigo-400";
+  const Icon = isCompleted ? CheckCircle2 : Clock;
+  
+  return (
+    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 border border-border ${bg}`}>
+      <Icon className={`w-5 h-5 ${ic}`} />
+    </div>
+  );
+}
 
+// ─── Main Component ───────────────────────────────────────────────────
 export function TeamActivity() {
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case "completed":
-        return <CheckCircle2 className="w-5 h-5 text-green-600" />;
-      case "upload":
-        return <Upload className="w-5 h-5 text-blue-600" />;
-      case "comment":
-        return <MessageSquare className="w-5 h-5 text-purple-600" />;
-      case "started":
-        return <Clock className="w-5 h-5 text-orange-600" />;
-      default:
-        return <Activity className="w-5 h-5 text-muted-foreground" />;
+  const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
+  const navigate = useNavigate();
+
+  const currentTeam = teams?.find((t: any) => t.name === activeTeam);
+  const groupId = currentTeam?.group_id || currentTeam?.id;
+
+  const [loading, setLoading] = useState(true);
+  const [members, setMembers] = useState<any[]>([]);
+  const [teamTasks, setTeamTasks] = useState<any[]>([]);
+  const [activities, setActivities] = useState<any[]>([]);
+
+  // ─── Fetch Semua Data ───────────────────────────────────────────────
+  const fetchActivityData = useCallback(async () => {
+    if (!groupId) return;
+    setLoading(true);
+
+    try {
+      // 1. Fetch Members
+      const resMembers = await fetch(`${API}/groupGetMember`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: groupId }),
+      });
+      const dataMembers = await resMembers.json();
+      if (dataMembers.status === "sukses") setMembers(dataMembers.data || []);
+
+      // 2. Fetch Detail Tasks (Semua tugas di tim ini)
+      const resTeamTasks = await fetch(`${API}/detailTaskGetByGroup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: groupId }),
+      });
+      const dataTeamTasks = await resTeamTasks.json();
+      if (dataTeamTasks.status === "sukses") setTeamTasks(dataTeamTasks.data || []);
+
+      // 3. Fetch Activity Log
+      const resActivity = await fetch(`${API}/getActivityByGroup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ group_id: groupId }),
+      });
+      const dataActivity = await resActivity.json();
+      if (dataActivity.status === "sukses") setActivities(dataActivity.data || []);
+
+    } catch (err) {
+      console.error("Gagal fetch activity data:", err);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [groupId]);
+
+  useEffect(() => {
+    fetchActivityData();
+  }, [fetchActivityData]);
+
+  // ─── Kalkulasi Overall Team Progress ────────────────────────────────
+  const totalTasks = teamTasks.length;
+  const completedTasks = teamTasks.filter(t => 
+    (t.detail_task_status || t.DetailTaskStatus) === "completed" || 
+    (t.detail_task_status || t.DetailTaskStatus) === "C"
+  ).length;
+  const remainingTasks = totalTasks - completedTasks;
+  const overallProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+
+  // ─── Kalkulasi Member Progress ──────────────────────────────────────
+  const memberStats = members.map(m => {
+    const memId = String(m.user_id || m.UserId);
+    // Cari tugas yang di-assign ke member ini
+    const mTasks = teamTasks.filter(t => String(t.user_id || t.UserId) === memId);
+    const mTotal = mTasks.length;
+    const mComplete = mTasks.filter(t => 
+      (t.detail_task_status || t.DetailTaskStatus) === "completed" || 
+      (t.detail_task_status || t.DetailTaskStatus) === "C"
+    ).length;
+    const mProgress = mTotal > 0 ? Math.round((mComplete / mTotal) * 100) : 0;
+
+    return {
+      id: memId,
+      name: m.user_full_name || m.name || `User ${memId}`,
+      totalTasks: mTotal,
+      completedTasks: mComplete,
+      progress: mProgress
+    };
+  });
+
+  // Urutkan memberStats berdasarkan yang progressnya tertinggi (Opsional)
+  memberStats.sort((a, b) => b.progress - a.progress);
+
+  // Jika tidak ada tim aktif
+  if (!groupId) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] p-8">
+        <h2 className="text-2xl font-bold text-slate-900 dark:text-slate-50 mb-2">No active team selected</h2>
+        <p className="text-slate-500 dark:text-slate-400 mb-8">Please select or join a team first to view activity.</p>
+        <Button onClick={() => navigate("/team-management")} className="rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-500 text-white">
+          <Users className="w-4 h-4 mr-2" /> Team Management
+        </Button>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[70vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+      </div>
+    );
+  }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-3xl font-semibold text-foreground mb-1">Team Activity</h1>
-        <p className="text-muted-foreground">Real-time updates and team progress tracking</p>
+        <p className="text-muted-foreground">Real-time updates and progress for <span className="font-semibold text-indigo-600 dark:text-indigo-400">{activeTeam}</span></p>
       </div>
 
       {/* Overall Team Progress */}
@@ -119,20 +155,20 @@ export function TeamActivity() {
         <CardContent>
           <div className="space-y-4">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">Team Completion</span>
-              <span className="text-2xl font-semibold text-indigo-600">68%</span>
+              <span className="text-sm font-medium text-muted-foreground">Team Completion</span>
+              <span className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{overallProgress}%</span>
             </div>
-            <Progress value={68} className="h-3" />
-            <div className="flex items-center justify-between text-sm text-muted-foreground">
-              <span>45 of 75 tasks completed</span>
-              <span>30 tasks remaining</span>
+            <Progress value={overallProgress} className="h-3" />
+            <div className="flex items-center justify-between text-sm text-muted-foreground font-medium mt-1">
+              <span>{completedTasks} of {totalTasks} tasks completed</span>
+              <span>{remainingTasks} tasks remaining</span>
             </div>
           </div>
         </CardContent>
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Activity Timeline */}
+        {/* Activity Timeline (Sama seperti Dashboard tapi tampilan Timeline) */}
         <Card className="lg:col-span-2 border-border shadow-sm">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
@@ -140,13 +176,11 @@ export function TeamActivity() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {activities.map((activity, idx) => (
-                <div key={activity.id} className="flex gap-4">
+              {activities.length > 0 ? activities.map((activity, idx) => (
+                <div key={activity.log_id || idx} className="flex gap-4">
                   {/* Timeline line */}
                   <div className="flex flex-col items-center">
-                    <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center flex-shrink-0 border border-border">
-                      {getActivityIcon(activity.type)}
-                    </div>
+                    <ActivityDot type={activity.action_type === 'I' || activity.action_description?.toLowerCase().includes('start') ? 'started' : 'completed'} />
                     {idx < activities.length - 1 && (
                       <div className="w-0.5 h-full bg-border mt-2"></div>
                     )}
@@ -154,140 +188,75 @@ export function TeamActivity() {
 
                   {/* Activity content */}
                   <div className="flex-1 pb-6">
-                    <div className="p-4 rounded-xl border border-border hover:bg-accent transition-colors">
+                    <div className="p-4 rounded-xl border border-border bg-slate-50 dark:bg-slate-950/50 hover:bg-accent transition-colors">
                       <div className="flex items-start gap-3">
-                        <Avatar className="w-10 h-10">
-                          <AvatarImage src={activity.avatar} />
-                          <AvatarFallback>{activity.user.charAt(0)}</AvatarFallback>
+                        <Avatar className="w-10 h-10 border border-white dark:border-slate-800 shadow-sm">
+                          <AvatarFallback className="bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400 font-semibold text-sm">
+                            {activity.user_full_name ? activity.user_full_name.substring(0, 2).toUpperCase() : "SI"}
+                          </AvatarFallback>
                         </Avatar>
-                        <div className="flex-1 space-y-2">
+                        <div className="flex-1 space-y-1">
                           <div>
                             <p className="text-sm">
-                              <span className="font-medium text-foreground">{activity.user}</span>
+                              <span className="font-semibold text-foreground">{activity.user_full_name || "Sistem"}</span>
                               {" "}
-                              <span className="text-muted-foreground">{activity.action}</span>
+                              <span className="text-muted-foreground">{activity.action_description}</span>
                               {" "}
-                              <span className="font-medium text-foreground">"{activity.target}"</span>
+                              <span className="font-semibold text-foreground">"{activity.task_title || "Group File"}"</span>
                             </p>
-                            <p className="text-xs text-muted-foreground mt-1">{activity.time}</p>
+                            <p className="text-xs text-muted-foreground mt-1 font-medium">
+                              {new Date(activity.audited_time).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                            </p>
                           </div>
-                          
-                          {activity.comment && (
-                            <div className="p-3 bg-muted rounded-lg">
-                              <p className="text-sm text-foreground italic">"{activity.comment}"</p>
-                            </div>
-                          )}
-
-                          {activity.progress !== undefined && (
-                            <div className="space-y-1">
-                              <div className="flex items-center justify-between text-xs">
-                                <span className="text-muted-foreground">Contributed to team progress</span>
-                                <span className="font-medium text-indigo-600">+{activity.progress}%</span>
-                              </div>
-                              <div className="w-full bg-muted rounded-full h-1.5">
-                                <div 
-                                  className="h-full bg-gradient-to-r from-indigo-600 to-cyan-500 rounded-full"
-                                  style={{ width: `${activity.progress}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </div>
                     </div>
                   </div>
                 </div>
-              ))}
+              )) : (
+                <div className="text-center py-10 text-muted-foreground border-2 border-dashed border-border rounded-xl">
+                  <Activity className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                  <p className="text-sm font-medium">No recent activity yet.</p>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Team Member Progress */}
-        <Card className="border-border shadow-sm">
+        {/* Team Member Individual Progress */}
+        <Card className="border-border shadow-sm h-fit">
           <CardHeader>
             <CardTitle>Member Progress</CardTitle>
-            <CardDescription>Individual completion rates</CardDescription>
+            <CardDescription>Individual completion rates in this team</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {teamProgress.map((member, idx) => (
-              <div key={idx} className="space-y-2">
+          <CardContent className="space-y-5">
+            {memberStats.length > 0 ? memberStats.map((member, idx) => (
+              <div key={member.id || idx} className="space-y-2">
                 <div className="flex items-center gap-3">
-                  <Avatar className="w-9 h-9">
-                    {/* <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${member.avatar}`} /> */}
-                    <AvatarFallback>{member.name.charAt(0)}</AvatarFallback>
+                  <Avatar className="w-9 h-9 border border-border shadow-sm">
+                    <AvatarFallback className="bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 text-xs font-bold">
+                      {member.name.split(" ").map((n: string) => n[0]).join("").substring(0, 2).toUpperCase()}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{member.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {member.tasksCompleted}/{member.tasksTotal} tasks
+                    <p className="text-sm font-semibold text-foreground truncate">{member.name}</p>
+                    <p className="text-[11px] text-muted-foreground font-medium mt-0.5">
+                      {member.completedTasks}/{member.totalTasks} tasks
                     </p>
                   </div>
-                  <Badge variant="secondary" className="text-xs">
+                  <Badge variant="outline" className={`text-[10px] font-bold ${
+                    member.progress === 100 && member.totalTasks > 0 ? "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400" :
+                    member.progress > 0 ? "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400" :
+                    "bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-900 dark:text-slate-400"
+                  }`}>
                     {member.progress}%
                   </Badge>
                 </div>
-                <Progress value={member.progress} className="h-2" />
+                <Progress value={member.progress} className="h-1.5" />
               </div>
-            ))}
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Activity Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="border-border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-foreground">45</p>
-                <p className="text-xs text-muted-foreground">Completed Tasks</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-                <Upload className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-foreground">23</p>
-                <p className="text-xs text-muted-foreground">Files Uploaded</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
-                <MessageSquare className="w-5 h-5 text-purple-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-foreground">156</p>
-                <p className="text-xs text-muted-foreground">Comments</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-border shadow-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
-                <Clock className="w-5 h-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-2xl font-semibold text-foreground">187h</p>
-                <p className="text-xs text-muted-foreground">Total Hours</p>
-              </div>
-            </div>
+            )) : (
+              <p className="text-sm text-center text-muted-foreground py-4">No members found.</p>
+            )}
           </CardContent>
         </Card>
       </div>

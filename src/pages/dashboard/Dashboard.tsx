@@ -67,7 +67,7 @@ export function Dashboard() {
   const currentUserId = currentUser?.UserID || currentUser?.user_id || currentUser?.id || null;
 
   const currentTeam = teams?.find((t: any) => t.name === activeTeam);
-  const groupId = currentTeam?.id;
+  const groupId = currentTeam?.group_id || currentTeam?.id;
 
   // ─── States ───
   const [members, setMembers] = useState<any[]>([]); 
@@ -81,7 +81,6 @@ export function Dashboard() {
     setLoading(true);
 
     try {
-      // 1. Fetch Data Member
       const resMembers = await fetch(`${API}/groupGetMember`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -90,15 +89,19 @@ export function Dashboard() {
       const dataMembers = await resMembers.json();
       if (dataMembers.status === "sukses") setMembers(dataMembers.data || []);
 
-      // 2. Fetch My Sub-Tasks
-      const resMyTasks = await fetch(`${API}/detailTaskGetByUser`, {
+      const resTeamTasks = await fetch(`${API}/detailTaskGetByGroup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: currentUserId }),
+        body: JSON.stringify({ group_id: groupId }),
       });
-      const dataMyTasks = await resMyTasks.json();
-      if (dataMyTasks.status === "sukses") {
-        const formattedTasks: MyTask[] = (dataMyTasks.data || []).map((t: any) => ({
+      const dataTeamTasks = await resTeamTasks.json();
+
+      if (dataTeamTasks.status === "sukses") {
+        const myTasksInThisTeam = (dataTeamTasks.data || []).filter((t: any) => 
+          String(t.UserId || t.user_id) === String(currentUserId)
+        );
+
+        const formattedTasks: MyTask[] = myTasksInThisTeam.map((t: any) => ({
           id: t.DetailTaskId || t.detail_task_id,
           taskId: t.TaskId || t.task_id,
           title: t.DetailTaskName || t.detail_task_name,
@@ -109,7 +112,6 @@ export function Dashboard() {
         setMyTasks(formattedTasks);
       }
 
-      // 3. Fetch Team Activity Log
       const resActivity = await fetch(`${API}/getActivityByGroup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -131,12 +133,9 @@ export function Dashboard() {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  // ─── Kalkulasi Data ───
   const membersCount = members.length;
   
-  // ✅ DETEKSI ROLE ADMIN YANG SUDAH KEBAL PELURU
   const currentUserData = members.find(m => String(m.user_id) === String(currentUserId) || String(m.UserId) === String(currentUserId));
-  // Mengambil role dari berbagai kemungkinan nama kolom database
   const rawRole = String(currentUserData?.user_role || currentUserData?.role || currentUserData?.role_name || currentUserData?.RoleName || "").toLowerCase();
   const isUserAdmin = rawRole.includes("admin");
 
@@ -145,30 +144,8 @@ export function Dashboard() {
   const pendingMyTasks = myTasks.filter(t => t.status !== "completed" && t.status !== "C");
   const progressPercent = totalMyTasks > 0 ? Math.round((completedMyTasks / totalMyTasks) * 100) : 0;
 
-  // Logika Upcoming Deadlines (Max 7 Hari ke depan)
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const nextWeek = new Date(today);
-  nextWeek.setDate(today.getDate() + 7);
-
-  const upcomingDeadlines = myTasks
-    .filter(t => {
-      if (t.status === "completed" || t.status === "C") return false;
-      if (!t.deadline) return false;
-      const d = new Date(t.deadline);
-      return d >= today && d <= nextWeek;
-    })
-    .sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime())
-    .slice(0, 5);
-
-  // Mapping Nama Asli Member & Kalkulasi Workload UI
   const membersWL = members.map((m, i) => {
-    // 💡 CATATAN UNTUK NANTI: 
-    // Kalau backend sudah mengirimkan jumlah tugas pending per member di 'groupGetMember', 
-    // kamu bisa ganti getWL(i) di bawah ini dengan rumus asli: 
-    // const w = Math.round((m.pending_tasks / total_pending_di_grup) * 100);
-
-    const w = getWL(i); // <-- Ini masih mock persentase
+    const w = getWL(i); 
     return { 
       id: m.user_id || m.UserId, 
       name: m.user_full_name || m.name || `Member ${i+1}`, 
@@ -182,7 +159,6 @@ export function Dashboard() {
   const overloaded = membersWL.find((m) => m.wStatus === "overloaded") ?? membersWL[0];
   const under = membersWL.find((m) => m.wStatus === "under-utilized") ?? membersWL[membersWL.length - 1];
 
-  // ✅ Fungsi Eksekusi Rebalance Group
   const handleConfirmRebalance = async () => {
     if (!groupId) return;
     setIsRebalancing(true);
@@ -298,88 +274,52 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Workload + My Deadlines */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Workload */}
-        <Card className="lg:col-span-2 border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50"><Brain className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />AI Workload Distribution</CardTitle>
-                <CardDescription className="dark:text-slate-400">Team balance in {activeTeam}</CardDescription>
-              </div>
-             {/* ✅ Tombol Rebalance HANYA MUNCUL untuk Admin */}
-             {isUserAdmin && (
-                <Button size="sm" onClick={() => setRebalanceModal(true)} className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl shadow-md text-xs px-4 gap-1.5 dark:shadow-none">
-                  <Shuffle className="w-3.5 h-3.5" /> Rebalance
-                </Button>
-              )}
+      {/* Workload */}
+      <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-slate-900 dark:text-slate-50"><Brain className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />AI Workload Distribution</CardTitle>
+              <CardDescription className="dark:text-slate-400">Team balance in {activeTeam}</CardDescription>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {membersWL.slice(0, 3).map((m) => (
-              <div key={m.id} className={`p-4 rounded-xl border transition-all ${m.wStatus === "overloaded" ? "border-red-200 bg-red-50/40 dark:border-red-900/50 dark:bg-red-950/20" : m.wStatus === "slightly-high" ? "border-amber-200 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/20" : "border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950 hover:border-indigo-100 dark:hover:border-indigo-900"}`}>
-                <div className="flex items-center gap-4">
-                  <Avatar className="w-10 h-10 border border-white dark:border-slate-800 shadow-sm">
-                    <AvatarFallback className={`text-sm font-semibold ${m.wStatus === "overloaded" ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" : m.wStatus === "slightly-high" ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400"}`}>
-                      {m.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{m.name}</p>
-                        <p className="text-xs text-slate-400 dark:text-slate-500">{m.role}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <StatusBadge s={m.wStatus} />
-                        <span className={`text-sm font-bold ${txtCls(m.workload)}`}>{m.workload}%</span>
-                      </div>
+            {isUserAdmin && (
+              <Button size="sm" onClick={() => setRebalanceModal(true)} className="bg-gradient-to-r from-indigo-600 to-cyan-500 hover:from-indigo-700 hover:to-cyan-600 text-white rounded-xl shadow-md text-xs px-4 gap-1.5 dark:shadow-none">
+                <Shuffle className="w-3.5 h-3.5" /> Rebalance
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {membersWL.slice(0, 3).map((m) => (
+            <div key={m.id} className={`p-4 rounded-xl border transition-all ${m.wStatus === "overloaded" ? "border-red-200 bg-red-50/40 dark:border-red-900/50 dark:bg-red-950/20" : m.wStatus === "slightly-high" ? "border-amber-200 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/20" : "border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950 hover:border-indigo-100 dark:hover:border-indigo-900"}`}>
+              <div className="flex items-center gap-4">
+                <Avatar className="w-10 h-10 border border-white dark:border-slate-800 shadow-sm">
+                  <AvatarFallback className={`text-sm font-semibold ${m.wStatus === "overloaded" ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" : m.wStatus === "slightly-high" ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400"}`}>
+                    {m.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{m.name}</p>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">{m.role}</p>
                     </div>
-                    <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                      <div className={`h-full ${barCls(m.workload)} transition-all duration-700 rounded-full`} style={{ width: `${m.workload}%` }} />
+                    <div className="flex items-center gap-2">
+                      <StatusBadge s={m.wStatus} />
+                      <span className={`text-sm font-bold ${txtCls(m.workload)}`}>{m.workload}%</span>
                     </div>
+                  </div>
+                  <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                    <div className={`h-full ${barCls(m.workload)} transition-all duration-700 rounded-full`} style={{ width: `${m.workload}%` }} />
                   </div>
                 </div>
               </div>
-            ))}
-          </CardContent>
-        </Card>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
 
-        {/* My Upcoming Deadlines */}
-        <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-50"><Clock className="w-4 h-4 text-orange-600 dark:text-orange-400" />My Upcoming Deadlines</CardTitle>
-            <CardDescription className="text-xs dark:text-slate-400">Due in 7 days</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {upcomingDeadlines.length > 0 ? upcomingDeadlines.map((d) => (
-              <div key={d.id} className="p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:bg-white dark:hover:bg-slate-900 hover:border-indigo-100 dark:hover:border-indigo-900 transition-all cursor-pointer group" onClick={() => navigate("/tasks")}>
-                <div className="flex items-start justify-between gap-2 mb-1.5">
-                  <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex-1 leading-snug group-hover:text-indigo-700 dark:group-hover:text-indigo-400 transition-colors">{d.title}</p>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                    <CalendarIcon className="w-3 h-3 text-orange-500" />
-                    {new Date(d.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                  </span>
-                </div>
-              </div>
-            )) : (
-              <div className="text-center py-8">
-                <CheckCircle2 className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                <p className="text-xs text-slate-400 dark:text-slate-500">No pressing deadlines!</p>
-              </div>
-            )}
-            <Button variant="ghost" size="sm" className="w-full text-xs text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/50 rounded-xl gap-1 mt-1" onClick={() => navigate("/tasks")}>
-              View All My Tasks <ArrowUpRight className="w-3 h-3" />
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Activity feed (Dinamis dari Backend) */}
+      {/* Activity feed */}
       <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -390,9 +330,9 @@ export function Dashboard() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex gap-4 overflow-x-auto pb-1 custom-scrollbar">
+          <div className="flex flex-col gap-3 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
             {activities.length > 0 ? activities.map((a, idx) => (
-              <div key={a.log_id || idx} className="flex items-start gap-3 min-w-[280px] p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:border-indigo-100 dark:hover:border-indigo-900 hover:bg-white dark:hover:bg-slate-900 transition-all flex-shrink-0">
+              <div key={a.log_id || idx} className="flex items-start gap-3 p-4 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 hover:border-indigo-100 dark:hover:border-indigo-900 hover:bg-white dark:hover:bg-slate-900 transition-all">
                 <ActivityDot type={a.action_type === 'I' || a.action_description?.toLowerCase().includes('start') ? 'started' : 'completed'} />
                 <div className="min-w-0">
                   <p className="text-xs text-slate-800 dark:text-slate-200">

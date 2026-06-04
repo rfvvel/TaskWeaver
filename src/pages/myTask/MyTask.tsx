@@ -14,12 +14,13 @@ const API = "http://localhost:3000/api";
 interface MyTask {
   id: number;
   taskId: number;
+  groupId: string; 
+  teamNameFromDB: string; 
   title: string;
   bigTaskTitle: string;
-  team: string;
   deadline: string;
   priority: "high" | "medium" | "low";
-  status: "todo" | "in-progress" | "completed";
+  status: "todo" | "in-progress" | "completed" | "C";
   category: string;
 }
 
@@ -30,7 +31,8 @@ function safeFormat(dateStr: any, fmt: string) {
 }
 
 export function MyTasks() {
-  const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
+  // activeTeam dihapus dari sini karena kita akan menampilkan semua task lintas tim
+  const { teams } = useOutletContext<{ teams: any[] }>();
 
   const storedUser = localStorage.getItem("user");
   const currentUser = storedUser ? JSON.parse(storedUser) : null;
@@ -54,9 +56,10 @@ export function MyTasks() {
         const formattedTasks: MyTask[] = (json.data || []).map((t: any) => ({
           id: t.DetailTaskId || t.detail_task_id,
           taskId: t.TaskId || t.task_id,
+          groupId: String(t.group_id || t.GroupId || ""), 
+          teamNameFromDB: t.group_name || t.GroupName || "",
           title: t.DetailTaskName || t.detail_task_name,
           bigTaskTitle: `Task #${t.TaskId || t.task_id}`,
-          team: activeTeam || "Your Team",
           deadline: t.DetailTaskDeadline || t.detail_task_deadline,
           priority: "medium",
           status: t.DetailTaskStatus || t.detail_task_status || "todo",
@@ -69,25 +72,22 @@ export function MyTasks() {
     } finally {
       setLoading(false);
     }
-  }, [currentUserId, activeTeam]);
+  }, [currentUserId]);
 
   useEffect(() => {
     fetchMyTasks();
   }, [fetchMyTasks]);
 
-  // ✅ INI ADALAH SATU-SATUNYA BAGIAN YANG DITAMBAHKAN (Activity Logger)
   const updateTaskStatus = async (detailTaskId: number, newStatus: string) => {
     try {
       setMyTasks(prev => prev.map(t => t.id === detailTaskId ? { ...t, status: newStatus as any } : t));
       
-      // 1. Update status tugas di database
       await fetch(`${API}/detailTaskUpdateStatus`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ detail_task_id: detailTaskId, new_status: newStatus }),
       });
 
-      // 2. Tembak Riwayat ke Activity Log secara diam-diam!
       const task = myTasks.find(t => t.id === detailTaskId);
       if (task) {
         const actionType = newStatus === "in-progress" ? "I" : "C";
@@ -120,7 +120,6 @@ export function MyTasks() {
   const [activeTab, setActiveTab] = useState("link");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // STATE BARU UNTUK MODAL PREVIEW/VIEW FILE
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingTask, setViewingTask] = useState<MyTask | null>(null);
   const [viewingFiles, setViewingFiles] = useState<any[]>([]);
@@ -134,26 +133,23 @@ export function MyTasks() {
     setSubmitDialogOpen(true);
   };
 
-  // FUNGSI BARU UNTUK BUKA MODAL PREVIEW
   const openViewDialog = async (task: MyTask) => {
     setViewingTask(task);
     setViewDialogOpen(true);
     setIsLoadingFiles(true);
     setViewingFiles([]);
 
-    const currentTeam = teams?.find((t: any) => t.name === activeTeam);
-    const groupId = currentTeam?.id;
+    const taskGroupId = task.groupId;
 
-    if (groupId) {
+    if (taskGroupId) {
       try {
         const res = await fetch(`${API}/getTaskFilesByGroup`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ group_id: groupId })
+          body: JSON.stringify({ group_id: taskGroupId })
         });
         const json = await res.json();
         if (json.status === "sukses") {
-          // Menyaring agar hanya memunculkan file milik task yang di-klik
           const filesForThisTask = (json.data || []).filter(
             (f: any) => String(f.detail_task_id) === String(task.id)
           );
@@ -169,11 +165,10 @@ export function MyTasks() {
   const confirmSubmit = async () => {
     if (!submittingTask || !currentUserId) return;
     
-    const currentTeam = teams?.find((t: any) => t.name === activeTeam);
-    const groupId = currentTeam?.id;
+    const taskGroupId = submittingTask.groupId;
 
-    if (!groupId) {
-      alert("Error: Tidak dapat menemukan ID Tim.");
+    if (!taskGroupId) {
+      alert("Error: Tugas ini tidak memiliki ID Tim yang valid.");
       return;
     }
 
@@ -185,7 +180,7 @@ export function MyTasks() {
         formData.append("file", submissionFile);
         formData.append("detail_task_id", String(submittingTask.id));
         formData.append("uploaded_by", String(currentUserId));
-        formData.append("group_id", String(groupId));
+        formData.append("group_id", String(taskGroupId)); 
         formData.append("file_category", submissionCategory); 
 
         const res = await fetch(`${API}/insertTaskFile`, {
@@ -226,65 +221,69 @@ export function MyTasks() {
     return list;
   };
 
-  const TaskCard = ({ task, showActions = true }: { task: MyTask; showActions?: boolean }) => (
-    <Card className={`border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow ${(task.status === "completed" || task.status === "C") ? "opacity-60" : ""}`}>
-      <CardContent className="p-4">
-        <div className="flex items-start gap-4">
-          {getStatusIcon(task.status)}
-          <div className="flex-1 space-y-2">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h3 className={`font-medium ${(task.status === "completed" || task.status === "C") ? "line-through text-slate-500" : "text-slate-900 dark:text-slate-100"}`}>
-                  {task.title}
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  From: <span className="font-medium text-indigo-500 dark:text-indigo-400">{task.bigTaskTitle}</span> · {task.team}
-                </p>
+  const TaskCard = ({ task, showActions = true }: { task: MyTask; showActions?: boolean }) => {
+    const matchedTeam = teams?.find((t: any) => String(t.group_id || t.id) === String(task.groupId));
+    const displayTeamName = task.teamNameFromDB || matchedTeam?.name || "Unknown Team";
+
+    return (
+      <Card className={`border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow ${(task.status === "completed" || task.status === "C") ? "opacity-60" : ""}`}>
+        <CardContent className="p-4">
+          <div className="flex items-start gap-4">
+            {getStatusIcon(task.status)}
+            <div className="flex-1 space-y-2">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h3 className={`font-medium ${(task.status === "completed" || task.status === "C") ? "line-through text-slate-500" : "text-slate-900 dark:text-slate-100"}`}>
+                    {task.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    From: <span className="font-medium text-indigo-500 dark:text-indigo-400">{task.bigTaskTitle}</span> · <span className="font-semibold text-slate-600 dark:text-slate-300">{displayTeamName}</span>
+                  </p>
+                </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 flex-wrap">
-              <span className="flex items-center gap-1">
-                <Flag className="w-4 h-4" />
-                {safeFormat(task.deadline, "MMM dd, yyyy")}
-              </span>
-            </div>
+              <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 flex-wrap">
+                <span className="flex items-center gap-1">
+                  <Flag className="w-4 h-4" />
+                  {safeFormat(task.deadline, "MMM dd, yyyy")}
+                </span>
+              </div>
 
-            {showActions && task.status !== "completed" && task.status !== "C" && (
-              <div className="flex flex-wrap gap-2 pt-1">
-                {task.status !== "in-progress" && (
-                  <Button size="sm" variant="outline" className="dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" onClick={() => updateTaskStatus(task.id, "in-progress")}>
-                    Start
+              {showActions && task.status !== "completed" && task.status !== "C" && (
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {task.status !== "in-progress" && (
+                    <Button size="sm" variant="outline" className="dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" onClick={() => updateTaskStatus(task.id, "in-progress")}>
+                      Start
+                    </Button>
+                  )}
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white border-none" onClick={() => openSubmitDialog(task)}>
+                    Complete
                   </Button>
-                )}
-                <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white border-none" onClick={() => openSubmitDialog(task)}>
-                  Complete
-                </Button>
-              </div>
-            )}
+                </div>
+              )}
 
-            {/* TOMBOL VIEW WORK HANYA MUNCUL JIKA TASK COMPLETED */}
-            {showActions && (task.status === "completed" || task.status === "C") && (
-              <div className="flex flex-wrap gap-2 pt-1 mt-1">
-                <Button size="sm" variant="outline" 
-                  className="border-indigo-200 text-indigo-600 dark:border-indigo-800 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30" 
-                  onClick={() => openViewDialog(task)}>
-                  <Eye className="w-4 h-4 mr-1.5" /> View Work
-                </Button>
-              </div>
-            )}
+              {showActions && (task.status === "completed" || task.status === "C") && (
+                <div className="flex flex-wrap gap-2 pt-1 mt-1">
+                  <Button size="sm" variant="outline" 
+                    className="border-indigo-200 text-indigo-600 dark:border-indigo-800 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30" 
+                    onClick={() => openViewDialog(task)}>
+                    <Eye className="w-4 h-4 mr-1.5" /> View Work
+                  </Button>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
       <div>
         <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-50 mb-1">My Tasks</h1>
         <p className="text-slate-500 dark:text-slate-400">
-          Sub-tasks assigned to you in <span className="font-semibold text-indigo-500">{activeTeam}</span>
+          All sub-tasks assigned to you across your teams
         </p>
       </div>
 
@@ -430,7 +429,7 @@ export function MyTasks() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL BARU: VIEW SUBMITTED WORK */}
+      {/* MODAL VIEW SUBMITTED WORK */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 sm:max-w-md text-slate-900 dark:text-slate-50">
           <DialogHeader>

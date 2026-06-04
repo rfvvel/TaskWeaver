@@ -55,7 +55,6 @@ interface Member {
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-// ✅ PERBAIKAN: Fungsi kebal error untuk memformat tanggal
 function safeFormat(dateStr: any, fmt: string) {
   if (!dateStr) return "No date";
   const d = new Date(dateStr);
@@ -103,7 +102,6 @@ function MiniCalendar({ selected, onSelect }: { selected?: Date; onSelect: (date
 
   return (
     <div className="p-3 select-none w-[280px]">
-      {/* Header */}
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={() => setViewDate(subMonths(viewDate, 1))}
@@ -122,7 +120,6 @@ function MiniCalendar({ selected, onSelect }: { selected?: Date; onSelect: (date
         </button>
       </div>
 
-      {/* Day labels */}
       <div className="grid grid-cols-7 mb-1">
         {DAY_LABELS.map((d) => (
           <div key={d} className="h-8 flex items-center justify-center text-xs font-medium text-slate-400 dark:text-slate-500">
@@ -131,7 +128,6 @@ function MiniCalendar({ selected, onSelect }: { selected?: Date; onSelect: (date
         ))}
       </div>
 
-      {/* Date grid */}
       <div className="grid grid-cols-7">
         {days.map((day, i) => {
           const isCurrentMonth = isSameMonth(day, viewDate);
@@ -203,7 +199,6 @@ export function TaskManagement() {
       });
       const json = await res.json();
       if (json.status === "sukses") {
-        // ✅ PERBAIKAN: Normalisasi data dari backend (snake_case) ke frontend (PascalCase)
         const normalizedTasks = (json.data ?? []).map((t: any) => ({
           TaskId: t.task_id || t.TaskId,
           Group_Id: t.group_id || t.Group_Id,
@@ -342,8 +337,8 @@ export function TaskManagement() {
     }
   };
 
-  // ── Delete Task ──
-  const handleDeleteTask = async (task_id: number) => {
+  // ── Delete Task (DENGAN LOG ACTIVITY) ──
+  const handleDeleteTask = async (task_id: number, task_title: string) => {
     try {
       const res = await fetch(`${API}/taskDelete`, {
         method: "POST",
@@ -352,6 +347,23 @@ export function TaskManagement() {
       });
       const json = await res.json();
       if (json.status === "sukses") {
+
+        // 🔥 Catat Log Activity Hapus Tugas Besar 🔥
+        try {
+          await fetch(`${API}/activityCreate`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              task_id: task_id, 
+              user_id: currentUserId,
+              action_type: "D", 
+              action_description: `deleted big task "${task_title}"` 
+            })
+          });
+        } catch (logErr) {
+          console.error("Gagal mencatat log hapus:", logErr);
+        }
+
         fetchTasks();
         if (selectedTask?.TaskId === task_id) setDetailsOpen(false);
       } else {
@@ -554,7 +566,6 @@ export function TaskManagement() {
                   <PopoverTrigger asChild>
                     <Button variant="outline" className="w-full justify-start text-left font-normal rounded-xl dark:bg-slate-950 dark:border-slate-800">
                       <CalendarIcon className="mr-2 h-4 w-4 text-slate-400" />
-                      {/* ✅ PERBAIKAN: Cukup pakai operator ternary, tidak perlu format safe di sini karena sudah aman dari state Date */}
                       {formData.TaskDeadline ? format(new Date(formData.TaskDeadline), "PPP") : "Pick a date"}
                     </Button>
                   </PopoverTrigger>
@@ -594,7 +605,6 @@ export function TaskManagement() {
                   {selectedTask.TaskDescription}
                 </DialogDescription>
                 <p className="text-sm text-slate-500 mt-1">
-                  {/* ✅ PERBAIKAN: Gunakan safeFormat agar tidak crash */}
                   Deadline: {safeFormat(selectedTask.TaskDeadline, "PPP")}
                 </p>
               </DialogHeader>
@@ -670,7 +680,6 @@ export function TaskManagement() {
                             {sub.detail_task_name}
                           </span>
                           <p className="text-xs text-slate-400 mt-0.5">
-                            {/* ✅ PERBAIKAN: Gunakan safeFormat agar tidak crash */}
                             Deadline: {safeFormat(sub.detail_task_deadline, "MMM dd, yyyy")}
                           </p>
                         </div>
@@ -724,7 +733,6 @@ export function TaskManagement() {
                       </Badge>
                       <Badge variant="outline" className="rounded-md gap-1 bg-slate-50 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-400">
                         <CalendarIcon className="w-3 h-3 text-slate-400" />
-                        {/* ✅ PERBAIKAN: Gunakan safeFormat agar tidak crash */}
                         {safeFormat(task.TaskDeadline, "MMM dd")}
                       </Badge>
                       <Badge variant="outline" className="rounded-md gap-1 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-400 border-indigo-200 dark:border-indigo-900/50">
@@ -753,7 +761,8 @@ export function TaskManagement() {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel className="rounded-xl dark:border-slate-800">Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteTask(task.TaskId)}
+                          {/* 🔥 PERBAIKAN: Menambahkan parameter task.TaskName ke fungsi onClick 🔥 */}
+                          <AlertDialogAction onClick={() => handleDeleteTask(task.TaskId, task.TaskName)}
                             className="rounded-xl bg-red-600 hover:bg-red-700 text-white border-none">Delete</AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>

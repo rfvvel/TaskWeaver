@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -73,8 +72,6 @@ export function Layout() {
  
   const user = getUser();
   
-  // Mengunci nama agar sinkron dengan menu Settings Anda ("yuriqe non")
-  // UserModel menyimpan sebagai UserFullName (PascalCase)
   const userFullName: string = user.UserFullName ?? user.user_full_name ?? localStorage.getItem("name") ?? "User";
  
   const avatarInitials: string =
@@ -86,10 +83,8 @@ export function Layout() {
       .map((w: string) => w[0].toUpperCase())
       .join("") || "Y";
  
-  // user_id — UserModel menyimpan sebagai UserID (PascalCase)
   const resolvedUserId = user.UserID ?? user.user_id ?? user.id ?? "";
  
-  // WAJIB ada field "id" karena Chat.tsx pakai currentUser.id untuk isOwn & API calls
   const currentUser = {
     id:      resolvedUserId,
     user_id: resolvedUserId,
@@ -101,15 +96,12 @@ export function Layout() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [activeTeam, setActiveTeam] = useState<string>("Loading...");
   const [loading, setLoading] = useState<boolean>(true);
-  const [isLocalMode, setIsLocalMode] = useState<boolean>(false);
  
-  // ── Ambil Data Tim + Members Dari Backend ────────────────────────────────────
+  // ── Murni Ambil Data Tim + Members Dari Backend ────────────────────────────
   useEffect(() => {
     const fetchUserTeams = async () => {
       setLoading(true);
-      setIsLocalMode(false);
       try {
-        // Step 1: Ambil semua group milik user
         const response = await fetch("http://localhost:3000/api/groupGetGroupByUserId", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -129,7 +121,6 @@ export function Layout() {
             members:     [],
           }));
  
-          // Step 2: Fetch members tiap group secara paralel
           const teamsWithMembers: Team[] = await Promise.all(
             baseTeams.map(async (team) => {
               try {
@@ -178,20 +169,8 @@ export function Layout() {
         }
       } catch (err) {
         console.error("Gagal terhubung ke backend:", err);
-        setIsLocalMode(true);
-        const defaultData: Team[] = [{
-          group_id: "1",
-          name: "aliran ilegal",
-          description: "Software Engineering Project Team",
-          inviteCode: "TW-8X9P2",
-          bigTasks: [],
-          members: [
-            { user_id: "1", name: "yuriqe non", email: "darren123@gmail.com", role: "admin", avatarSeed: "y", joinDate: "" },
-            { user_id: "2", name: "Steven lol",  email: "steven@gmail.com",    role: "admin", avatarSeed: "s", joinDate: "" },
-          ],
-        }];
-        setTeams(defaultData);
-        setActiveTeam("aliran ilegal");
+        setTeams([]);
+        setActiveTeam("No Team");
       } finally {
         setLoading(false);
       }
@@ -264,15 +243,8 @@ export function Layout() {
           </div>
  
           <div className="flex items-center gap-3">
-            {isLocalMode && (
-              <div className="flex items-center gap-1.5 text-amber-500 bg-amber-50 dark:bg-amber-950/20 px-3 py-1.5 rounded-lg text-xs border border-amber-200 dark:border-amber-900 animate-pulse">
-                <AlertCircle className="w-3.5 h-3.5" />
-                <span>Local Mode (Fallback)</span>
-              </div>
-            )}
- 
             <DropdownMenu>
-              <DropdownMenuTrigger asChild disabled={loading}>
+              <DropdownMenuTrigger asChild disabled={loading || teams.length === 0}>
                 <Button variant="outline" className="gap-2 rounded-xl border-border">
                   <span className="text-sm">{loading ? "Loading..." : activeTeam}</span>
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
