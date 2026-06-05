@@ -22,6 +22,7 @@ import {
 } from "../../components/ui/alert-dialog";
 import { channelApi, chatApi } from "../../api/chatApi";
 import type { ApiChannel, ApiChat } from "../../api/chatApi";
+import { getSocket } from "../../api/socket";
  
 // ─── Types ────────────────────────────────────────────────────────────────────
  
@@ -174,7 +175,30 @@ export function Chat() {
     setMessages([]);
     fetchMessages();
   }, [fetchMessages]);
- 
+
+  // ── Real-time: dengarkan pesan baru di channel aktif ─────────────────────────
+
+  useEffect(() => {
+    if (!groupId || !activeChannelId) return;
+    const socket = getSocket();
+    socket.emit("joinChannel", { group_id: groupId, channel_id: activeChannelId });
+
+    const onNew = (payload: ApiChat) => {
+      if (String(payload.channel_id) !== String(activeChannelId)) return;
+      setMessages((prev) =>
+        prev.some((m) => m.id === payload.chat_id)
+          ? prev
+          : [...prev, toMessage(payload, userId)]
+      );
+    };
+    socket.on("chat:new", onNew);
+
+    return () => {
+      socket.emit("leaveChannel", { group_id: groupId, channel_id: activeChannelId });
+      socket.off("chat:new", onNew);
+    };
+  }, [groupId, activeChannelId, userId]);
+
   // ── Auto scroll ────────────────────────────────────────────────────────────
  
   useEffect(() => {
