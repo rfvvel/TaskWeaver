@@ -58,11 +58,22 @@ export function Layout() {
   const [activeTeam, setActiveTeam] = useState<string>("Loading...");
   const [loading, setLoading] = useState<boolean>(true);
   
-  // 🌓 STATE UNTUK MODE GELAP / TERANG (DARK MODE)
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     return document.documentElement.classList.contains("dark") || 
            localStorage.getItem("theme") === "dark";
   });
+
+  // Sinkronisasi mendengarkan event dari Settings.tsx
+  useEffect(() => {
+    const handleThemeUpdated = () => {
+      const currentTheme = localStorage.getItem("theme") === "dark" || 
+                           document.documentElement.classList.contains("dark");
+      setIsDarkMode(currentTheme);
+    };
+
+    window.addEventListener("tw_theme_updated", handleThemeUpdated);
+    return () => window.removeEventListener("tw_theme_updated", handleThemeUpdated);
+  }, []);
 
   const toggleTheme = () => {
     if (isDarkMode) {
@@ -74,9 +85,10 @@ export function Layout() {
       localStorage.setItem("theme", "dark");
       setIsDarkMode(true);
     }
+    // Memicu event agar halaman Settings ikut ter-update jika tombol ini diklik
+    window.dispatchEvent(new Event("tw_theme_updated"));
   };
   
-  // 🕒 STATE UNTUK JAM & TANGGAL REAL-TIME
   const [time, setTime] = useState<Date>(new Date());
 
   useEffect(() => {
@@ -117,7 +129,6 @@ export function Layout() {
     user.UserFullName ?? user.user_full_name ?? localStorage.getItem("name") ?? "User"
   );
 
-  // Re-read name whenever Settings saves a profile update
   useEffect(() => {
     const handleUserUpdated = () => {
       const u = getUser();
@@ -307,26 +318,24 @@ export function Layout() {
             </DropdownMenu>
           </div>
  
-          {/* BAGIAN WIDGET JAM, TANGGAL & UTILITY BUTTONS */}
           <div className="flex items-center gap-4">
-            {/* 🌗 TOMBOL SWITCH SUN / MOON (DARK MODE TOGGLE) */}
             <Button 
               variant="outline" 
               size="icon" 
               onClick={toggleTheme} 
               className="rounded-xl border-border bg-background hover:bg-accent text-foreground shadow-sm"
-              title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              title={isDarkMode ? "Active: Dark Mode" : "Active: Light Mode"}
             >
+              {/* DI SINI SUDAH DITUKAR: Jika isDarkMode aktif tampilkan Moon, jika Light aktif tampilkan Sun */}
               {isDarkMode ? (
-                <Sun className="w-[18px] h-[18px] text-amber-500 animate-pulse" />
+                <Moon className="w-[18px] h-[18px] text-blue-400 animate-pulse" />
               ) : (
-                <Moon className="w-[18px] h-[18px] text-blue-600" />
+                <Sun className="w-[18px] h-[18px] text-amber-500" />
               )}
             </Button>
 
-            {/* 📅 WIDGET JAM DAN TANGGAL AUTOMATIC REDIRECT */}
             <div 
-              onClick={() => navigate("/calendar")} // 👈 SEKARANG KALO DIKLIK OTOMATIS CO-REDIRECT KE CALENDAR
+              onClick={() => navigate("/calendar")} 
               className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-muted/60 border border-border/60 shadow-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-300 dark:hover:border-blue-800 transition-all active:scale-95"
               title="Go to Calendar"
             >

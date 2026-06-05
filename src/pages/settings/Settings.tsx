@@ -13,8 +13,6 @@ import { Separator } from "../../components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/tabs";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 
-// ─── Skill Config ──────────────────────────────────────────────────────────────
-
 const SUGGESTED_CATEGORIES: { label: string; color: string }[] = [
   { label: "Frontend",           color: "bg-blue-100 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900" },
   { label: "Backend",            color: "bg-green-100 dark:bg-green-950/40 text-green-700 dark:text-green-300 border-green-200 dark:border-green-900" },
@@ -70,7 +68,6 @@ function getCategoryColor(cat: string) {
 
 type Skill = { id: string; name: string; category: string; level: string };
 
-// Format skill array → string untuk dikirim ke BE: "name,category,level|name,category,level"
 function skillsToString(skills: Skill[]): string {
   return JSON.stringify(skills);
 }
@@ -140,21 +137,18 @@ function CategoryCombobox({ value, onChange }: { value: string; onChange: (v: st
 export function Settings() {
   const navigate = useNavigate();
 
-  // ─── User data from localStorage ──────────────────────────────────────────
   const getUser = () => {
     try { return JSON.parse(localStorage.getItem("user") || "{}"); } catch { return {}; }
   };
   const user = getUser();
   const userId = user.UserID || user.user_id || user.id;
 
-  // ─── Profile state ─────────────────────────────────────────────────────────
   const [fullName,  setFullName]  = useState(user.UserFullName    || "");
   const [email,     setEmail]     = useState(user.UserEmail       || "");
   const [phone,     setPhone]     = useState(user.UserPhoneNumber || "");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  // Avatar: inisial dari setiap kata di fullName (maks 2 huruf), contoh "Rafael Vvel" → "RV"
   const avatarInitials = fullName
     .trim()
     .split(/\s+/)
@@ -177,7 +171,6 @@ export function Settings() {
       if (res.ok && result.status === "sukses") {
         const updated = { ...user, UserFullName: fullName, UserEmail: email, UserPhoneNumber: phone };
         localStorage.setItem("user", JSON.stringify(updated));
-        // Notify Layout (and any listener) that user data changed
         window.dispatchEvent(new Event("tw_user_updated"));
         setProfileMsg({ ok: true, text: "Profile updated successfully!" });
       } else {
@@ -297,6 +290,16 @@ export function Settings() {
     localStorage.getItem("theme") === "dark" || document.documentElement.classList.contains("dark")
   );
 
+  useEffect(() => {
+    const handleLayoutThemeChanged = () => {
+      const currentTheme = localStorage.getItem("theme") === "dark" || document.documentElement.classList.contains("dark");
+      setIsDark(currentTheme);
+    };
+
+    window.addEventListener("tw_theme_updated", handleLayoutThemeChanged);
+    return () => window.removeEventListener("tw_theme_updated", handleLayoutThemeChanged);
+  }, []);
+
   const applyTheme = (dark: boolean) => {
     if (dark) {
       document.documentElement.classList.add("dark");
@@ -306,6 +309,7 @@ export function Settings() {
       localStorage.setItem("theme", "light");
     }
     setIsDark(dark);
+    window.dispatchEvent(new Event("tw_theme_updated"));
   };
 
   const handleLogout = () => {
@@ -337,8 +341,6 @@ export function Settings() {
               <CardDescription>Update your personal information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-
-              {/* Avatar — inisial dari full name */}
               <div className="flex items-center gap-6">
                 <Avatar className="w-20 h-20">
                   <AvatarFallback className="bg-gradient-to-br from-indigo-500 to-cyan-500 text-white text-2xl font-bold">
@@ -349,7 +351,6 @@ export function Settings() {
 
               <Separator />
 
-              {/* Full Name — satu field, bukan first/last */}
               <div className="space-y-2">
                 <Label htmlFor="fullName">Full Name</Label>
                 <Input id="fullName" value={fullName} onChange={e => setFullName(e.target.value)} className="rounded-xl" placeholder="e.g. Rafael Vvel" />
@@ -365,7 +366,6 @@ export function Settings() {
                 <Input id="phone" value={phone} onChange={e => setPhone(e.target.value)} placeholder="+62 81234567" className="rounded-xl" />
               </div>
 
-              {/* Feedback message */}
               {profileMsg && (
                 <p className={`text-sm font-medium ${profileMsg.ok ? "text-green-600" : "text-red-500"}`}>
                   {profileMsg.ok ? "✓" : "⚠"} {profileMsg.text}
@@ -413,7 +413,6 @@ export function Settings() {
               </div>
             </CardHeader>
             <CardContent className="space-y-5">
-
               {showAddSkill && (
                 <div className="p-4 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50/60 dark:bg-indigo-950/20 space-y-3">
                   <div className="flex items-center justify-between">
@@ -471,7 +470,6 @@ export function Settings() {
               )}
             </CardContent>
           </Card>
-          {/* Skill Visibility card dihapus sesuai permintaan */}
         </TabsContent>
 
         {/* ── APPEARANCE ── */}
