@@ -174,7 +174,7 @@ export function Chat() {
     fetchMessages();
   }, [fetchMessages]);
  
-  // ── Real-time: dengarkan pesan baru di channel aktif ─────────────────────────
+  // ── Real-time: Listener Socket Anti-Duplikat / Anti-Dobel ────────────────────
  
   useEffect(() => {
     if (!groupId || !activeChannelId) return;
@@ -183,12 +183,29 @@ export function Chat() {
  
     const onNew = (payload: ApiChat) => {
       if (String(payload.channel_id) !== String(activeChannelId)) return;
-      setMessages((prev) =>
-        prev.some((m) => m.id === payload.chat_id)
-          ? prev
-          : [...prev, toMessage(payload, userId)]
-      );
+ 
+      setMessages((prev) => {
+        // 1. Cek apakah pesan dengan ID riil database ini sudah ada di state
+        const isAlreadyExists = prev.some((m) => m.id === payload.chat_id);
+        if (isAlreadyExists) return prev;
+ 
+        // 2. Cek apakah ini pesan kita sendiri yang berstatus data tiruan (optimistic)
+        const optimisticIndex = prev.findIndex(
+          (m) => m.id.startsWith("opt-") && m.message === payload.chat_message && m.userId === payload.user_id
+        );
+ 
+        if (optimisticIndex !== -1) {
+          // Jika ketemu data tiruan kita, langsung timpa datanya dengan objek asli dari Socket
+          const updatedMessages = [...prev];
+          updatedMessages[optimisticIndex] = toMessage(payload, userId);
+          return updatedMessages;
+        }
+ 
+        // 3. Jika pesan murni dari orang lain, append langsung ke paling bawah
+        return [...prev, toMessage(payload, userId)];
+      });
     };
+ 
     socket.on("chat:new", onNew);
  
     return () => {
@@ -213,35 +230,45 @@ export function Chat() {
   const slugify = (s: string) =>
     s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
  
-  // ── Send message ───────────────────────────────────────────────────────────
+  // ── Send message (Optimistic UI Only) ──────────────────────────────────────
  
   const handleSend = async () => {
     if (!message.trim() || !selectedChannel || !groupId || !userId) return;
     setSendingMsg(true);
  
+    const currentMsgText = message.trim();
+    const optimisticId = `opt-${Date.now()}`;
+ 
     const optimistic: Message = {
-      id: `opt-${Date.now()}`,
+      id: optimisticId,
       userId,
       user: currentUser?.name ?? "You",
-      message: message.trim(),
+      message: currentMsgText,
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       isOwn: true,
     };
+ 
+    // Munculkan pesan secara instan di layar dengan id sementara 'opt-xxx'
     setMessages((prev) => [...prev, optimistic]);
     setMessage("");
  
     try {
-      await chatApi.send(groupId, userId, activeChannelId, optimistic.message);
-      await fetchMessages();
+      // Jalankan API HTTP ke backend
+      await chatApi.send(groupId, userId, activeChannelId, currentMsgText);
+      
+      // ⚠️ Jangan memanggil fetchMessages() atau melakukan pembaruan state di sini.
+      // Biarkan useEffect Socket.io di atas yang menukar data tiruan secara riil.
+      
     } catch (err: unknown) {
-      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+      // Jika request API gagal, hapus kembali data tiruan tadi dari layar
+      setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       setApiError(err instanceof Error ? err.message : "Gagal mengirim pesan");
     } finally {
       setSendingMsg(false);
     }
   };
  
-  // ── Edit message ───────────────────────────────────────────────────────────
+  // ── Edit message ─────────────────────────────────────────────────────────
  
   const startEdit = (msg: Message) => {
     setEditingMsgId(msg.id);
@@ -534,7 +561,6 @@ export function Chat() {
                             <div className={`flex-1 max-w-[70%] ${msg.isOwn ? "flex flex-col items-end" : ""}`}>
                               <div className={`flex items-center gap-2 mb-1 ${msg.isOwn ? "flex-row-reverse" : ""}`}>
                                 <span className="text-xs text-slate-400">{msg.user}</span>
-                                {/* ✅ PERBAIKAN: Menambahkan utilitas font-semibold untuk ketebalan teks waktu */}
                                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{msg.time}</span>
                               </div>
  
