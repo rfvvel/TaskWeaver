@@ -160,7 +160,8 @@ export function TaskManagement() {
   const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
   
   const currentTeamObj = teams?.find(t => t.name === activeTeam);
-  const activeGroupId = currentTeamObj?.id;
+  
+  const activeGroupId = currentTeamObj?.group_id || currentTeamObj?.id;
 
   const storedUser = localStorage.getItem("user");
   const currentUser = storedUser ? JSON.parse(storedUser) : null;
@@ -177,6 +178,10 @@ export function TaskManagement() {
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isRebalancing, setIsRebalancing] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
+  
+  // Validation States
+  const [taskNameError, setTaskNameError] = useState("");
+  const [taskDescError, setTaskDescError] = useState("");
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [taskFile, setTaskFile] = useState<File | null>(null);
@@ -279,7 +284,12 @@ export function TaskManagement() {
 
   // ── Create Task ──
   const handleCreateTask = async () => {
-    if (!formData.TaskName || !formData.TaskDescription) return;
+    let hasError = false;
+    if (!formData.TaskName.trim()) { setTaskNameError("Task Title wajib diisi!"); hasError = true; }
+    if (!formData.TaskDescription.trim()) { setTaskDescError("Description wajib diisi!"); hasError = true; }
+    
+    if (hasError) return;
+
     try {
       const res = await fetch(`${API}/taskCreate`, {
         method: "POST",
@@ -310,6 +320,13 @@ export function TaskManagement() {
   // ── Update Task ──
   const handleUpdateTask = async () => {
     if (!editingTask) return;
+    
+    let hasError = false;
+    if (!formData.TaskName.trim()) { setTaskNameError("Task Title wajib diisi!"); hasError = true; }
+    if (!formData.TaskDescription.trim()) { setTaskDescError("Description wajib diisi!"); hasError = true; }
+    
+    if (hasError) return;
+
     try {
       const res = await fetch(`${API}/taskUpdate`, {
         method: "POST",
@@ -347,8 +364,6 @@ export function TaskManagement() {
       });
       const json = await res.json();
       if (json.status === "sukses") {
-
-        // 🔥 Catat Log Activity Hapus Tugas Besar 🔥
         try {
           await fetch(`${API}/activityCreate`, {
             method: "POST",
@@ -455,6 +470,8 @@ export function TaskManagement() {
   const resetForm = () => {
     setFormData(emptyForm);
     setTaskFile(null); 
+    setTaskNameError("");
+    setTaskDescError("");
   };
 
   const openEditDialog = (task: Task) => {
@@ -467,6 +484,8 @@ export function TaskManagement() {
       TaskPrerequisite: task.TaskPrerequisite,
     });
     setTaskFile(null);
+    setTaskNameError("");
+    setTaskDescError("");
     setDialogOpen(true);
   };
 
@@ -512,15 +531,23 @@ export function TaskManagement() {
             <div className="space-y-2">
               <Label>Task Title</Label>
               <Input placeholder="e.g. Develop Mobile App UI" value={formData.TaskName}
-                onChange={(e) => setFormData({ ...formData, TaskName: e.target.value })}
-                className="rounded-xl dark:bg-slate-950 dark:border-slate-800" />
+                onChange={(e) => {
+                  setFormData({ ...formData, TaskName: e.target.value });
+                  if (taskNameError) setTaskNameError("");
+                }}
+                className={`rounded-xl dark:bg-slate-950 dark:border-slate-800 ${taskNameError ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
+              {taskNameError && <p className="text-xs text-red-500 mt-1">{taskNameError}</p>}
             </div>
             
             <div className="space-y-2">
               <Label>Description</Label>
               <Textarea placeholder="Describe the overall goal..." value={formData.TaskDescription}
-                onChange={(e) => setFormData({ ...formData, TaskDescription: e.target.value })}
-                className="rounded-xl min-h-[100px] dark:bg-slate-950 dark:border-slate-800" />
+                onChange={(e) => {
+                  setFormData({ ...formData, TaskDescription: e.target.value });
+                  if (taskDescError) setTaskDescError("");
+                }}
+                className={`rounded-xl min-h-[100px] dark:bg-slate-950 dark:border-slate-800 ${taskDescError ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
+              {taskDescError && <p className="text-xs text-red-500 mt-1">{taskDescError}</p>}
             </div>
             
             <div className="space-y-2">
@@ -572,7 +599,12 @@ export function TaskManagement() {
                   <PopoverContent className="w-auto p-0 rounded-2xl bg-white dark:bg-slate-950 border dark:border-slate-800">
                     <MiniCalendar
                       selected={formData.TaskDeadline ? new Date(formData.TaskDeadline) : undefined}
-                      onSelect={(date) => setFormData({ ...formData, TaskDeadline: date.toISOString() })}
+                      onSelect={(date) => {
+                        const year = date.getFullYear();
+                        const month = String(date.getMonth() + 1).padStart(2, '0');
+                        const day = String(date.getDate()).padStart(2, '0');
+                        setFormData({ ...formData, TaskDeadline: `${year}-${month}-${day}T23:59:59` });
+                      }}
                     />
                   </PopoverContent>
                 </Popover>
@@ -761,7 +793,6 @@ export function TaskManagement() {
                         </AlertDialogHeader>
                         <AlertDialogFooter>
                           <AlertDialogCancel className="rounded-xl dark:border-slate-800">Cancel</AlertDialogCancel>
-                          {/* 🔥 PERBAIKAN: Menambahkan parameter task.TaskName ke fungsi onClick 🔥 */}
                           <AlertDialogAction onClick={() => handleDeleteTask(task.TaskId, task.TaskName)}
                             className="rounded-xl bg-red-600 hover:bg-red-700 text-white border-none">Delete</AlertDialogAction>
                         </AlertDialogFooter>

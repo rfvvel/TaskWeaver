@@ -25,7 +25,7 @@ export function Calendar() {
   const currentUserId = currentUser?.UserID || currentUser?.user_id || currentUser?.id || null;
 
   const currentTeam = teams?.find((t: any) => t.name === activeTeam);
-  const groupId = currentTeam?.id;
+  const groupId = currentTeam?.group_id || currentTeam?.id;
 
   // 2. Fetch data Sub-task lalu saring berdasarkan User Login
   useEffect(() => {

@@ -11,10 +11,10 @@ import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "../../components/ui/dialog";
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
+import { Progress } from "../../components/ui/progress";
 
 const API = "http://localhost:3000/api";
 
-// ─── Interfaces ───
 interface MyTask {
   id: number;
   taskId: number;
@@ -22,25 +22,6 @@ interface MyTask {
   bigTaskTitle: string;
   deadline: string;
   status: string;
-}
-
-// ─── Helpers (Sementara untuk UI Workload Persentase) ───
-const WL_PATTERNS = [38, 65, 28, 52, 45, 72, 20, 58, 33, 61];
-type WStatus = "under-utilized" | "balanced" | "slightly-high" | "overloaded";
-const getWL = (i: number) => WL_PATTERNS[i % WL_PATTERNS.length];
-const getWS = (w: number): WStatus => w < 35 ? "under-utilized" : w < 50 ? "balanced" : w < 63 ? "slightly-high" : "overloaded";
-const barCls = (w: number) => w < 35 ? "bg-blue-400" : w < 50 ? "bg-green-500" : w < 63 ? "bg-amber-400" : "bg-red-500";
-const txtCls = (w: number) => w < 35 ? "text-blue-600 dark:text-blue-400" : w < 50 ? "text-green-600 dark:text-green-400" : w < 63 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400";
-
-function StatusBadge({ s }: { s: WStatus }) {
-  const cls = { 
-    "balanced": "bg-green-50 text-green-700 border-green-200 dark:bg-green-950/30 dark:text-green-400 dark:border-green-900/50", 
-    "slightly-high": "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50", 
-    "under-utilized": "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/30 dark:text-blue-400 dark:border-blue-900/50", 
-    "overloaded": "bg-red-50 text-red-700 border-red-200 dark:bg-red-950/30 dark:text-red-400 dark:border-red-900/50" 
-  };
-  const lbl = { "balanced": "Balanced", "slightly-high": "Slightly High", "under-utilized": "Under-utilized", "overloaded": "Overloaded" };
-  return <Badge variant="outline" className={`text-[10px] font-semibold ${cls[s]}`}>{lbl[s]}</Badge>;
 }
 
 function ActivityDot({ type }: { type: string }) {
@@ -54,7 +35,6 @@ function ActivityDot({ type }: { type: string }) {
   return <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${bg}`}><Icon className={`w-4 h-4 ${ic}`} /></div>;
 }
 
-// ─── Main Component ───
 export function Dashboard() {
   const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
   const navigate = useNavigate();
@@ -69,13 +49,12 @@ export function Dashboard() {
   const currentTeam = teams?.find((t: any) => t.name === activeTeam);
   const groupId = currentTeam?.group_id || currentTeam?.id;
 
-  // ─── States ───
   const [members, setMembers] = useState<any[]>([]); 
+  const [teamTasks, setTeamTasks] = useState<any[]>([]); 
   const [myTasks, setMyTasks] = useState<MyTask[]>([]);
   const [activities, setActivities] = useState<any[]>([]); 
   const [loading, setLoading] = useState(true);
 
-  // ─── Fetch Data Dashboard ───
   const fetchDashboardData = useCallback(async () => {
     if (!groupId || !currentUserId) return;
     setLoading(true);
@@ -97,7 +76,10 @@ export function Dashboard() {
       const dataTeamTasks = await resTeamTasks.json();
 
       if (dataTeamTasks.status === "sukses") {
-        const myTasksInThisTeam = (dataTeamTasks.data || []).filter((t: any) => 
+        const allTasks = dataTeamTasks.data || [];
+        setTeamTasks(allTasks);
+
+        const myTasksInThisTeam = allTasks.filter((t: any) => 
           String(t.UserId || t.user_id) === String(currentUserId)
         );
 
@@ -144,22 +126,37 @@ export function Dashboard() {
   const pendingMyTasks = myTasks.filter(t => t.status !== "completed" && t.status !== "C");
   const progressPercent = totalMyTasks > 0 ? Math.round((completedMyTasks / totalMyTasks) * 100) : 0;
 
-  const membersWL = members.map((m, i) => {
-    const w = getWL(i); 
+  // Kalkulasi Workload Murni dari Database
+  const memberStats = members.map((m) => {
+    const memId = String(m.user_id || m.UserId);
+    const mTasks = teamTasks.filter(t => String(t.user_id || t.UserId) === memId);
+    
+    const mTotal = mTasks.length;
+    const mComplete = mTasks.filter(t => 
+      (t.detail_task_status || t.DetailTaskStatus) === "completed" || 
+      (t.detail_task_status || t.DetailTaskStatus) === "C"
+    ).length;
+    const mPending = mTotal - mComplete;
+    const mProgress = mTotal > 0 ? Math.round((mComplete / mTotal) * 100) : 0;
+
     const rRole = String(m.user_role || m.role || "").toLowerCase();
     const displayRole = (rRole === "a" || rRole.includes("admin")) ? "Admin" : "Member";
+
     return { 
-      id: m.user_id || m.UserId, 
-      name: m.user_full_name || m.name || `Member ${i+1}`, 
+      id: memId, 
+      name: m.user_full_name || m.name || `User ${memId}`, 
       role: displayRole, 
-      workload: w, 
-      wStatus: getWS(w), 
-      tasks: Math.floor(w / 10) 
+      totalTasks: mTotal,
+      completedTasks: mComplete,
+      pendingTasks: mPending, // Sisa tugas yang belum dikerjakan
+      progress: mProgress
     };
   });
-  
-  const overloaded = membersWL.find((m) => m.wStatus === "overloaded") ?? membersWL[0];
-  const under = membersWL.find((m) => m.wStatus === "under-utilized") ?? membersWL[membersWL.length - 1];
+
+  // Pencarian untuk Modal Rebalance (Urutkan dari yang sisa tugasnya terbanyak)
+  const sortedByPending = [...memberStats].sort((a, b) => b.pendingTasks - a.pendingTasks);
+  const overloaded = sortedByPending[0]; 
+  const under = sortedByPending[sortedByPending.length - 1]; 
 
   const handleConfirmRebalance = async () => {
     if (!groupId) return;
@@ -202,7 +199,6 @@ export function Dashboard() {
 
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-3xl font-semibold text-slate-900 dark:text-slate-50 mb-1">Dashboard</h1>
@@ -216,7 +212,6 @@ export function Dashboard() {
         </Badge>
       </div>
 
-      {/* 4 Stat Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: "Team Members", value: membersCount.toString(), sub: "Total enrolled", Icon: Users, accent: "bg-blue-500" },
@@ -241,7 +236,6 @@ export function Dashboard() {
         ))}
       </div>
 
-      {/* Sprint Task List */}
       <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -276,7 +270,7 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Workload */}
+      
       <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -291,37 +285,37 @@ export function Dashboard() {
             )}
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
-          {membersWL.slice(0, 3).map((m) => (
-            <div key={m.id} className={`p-4 rounded-xl border transition-all ${m.wStatus === "overloaded" ? "border-red-200 bg-red-50/40 dark:border-red-900/50 dark:bg-red-950/20" : m.wStatus === "slightly-high" ? "border-amber-200 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/20" : "border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950 hover:border-indigo-100 dark:hover:border-indigo-900"}`}>
-              <div className="flex items-center gap-4">
-                <Avatar className="w-10 h-10 border border-white dark:border-slate-800 shadow-sm">
-                  <AvatarFallback className={`text-sm font-semibold ${m.wStatus === "overloaded" ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-400" : m.wStatus === "slightly-high" ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400" : "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400"}`}>
-                    {m.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <div>
-                      <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{m.name}</p>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">{m.role}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StatusBadge s={m.wStatus} />
-                      <span className={`text-sm font-bold ${txtCls(m.workload)}`}>{m.workload}%</span>
-                    </div>
-                  </div>
-                  <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                    <div className={`h-full ${barCls(m.workload)} transition-all duration-700 rounded-full`} style={{ width: `${m.workload}%` }} />
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {memberStats.map((member) => (
+              <div key={member.id} className="p-4 rounded-xl border border-slate-100 bg-slate-50 dark:border-slate-800 dark:bg-slate-950 hover:border-indigo-100 dark:hover:border-indigo-900 transition-all">
+                <div className="flex items-center gap-3 mb-3">
+                  <Avatar className="w-10 h-10 border border-white dark:border-slate-800 shadow-sm">
+                    <AvatarFallback className="text-sm font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+                      {member.name.split(" ").map((n: string) => n[0]).join("").slice(0, 2).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">{member.name}</p>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">{member.role}</p>
                   </div>
                 </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-medium">{member.completedTasks}/{member.totalTasks} Tasks</span>
+                    <span className={`font-bold ${member.progress === 100 && member.totalTasks > 0 ? "text-green-600" : "text-indigo-600 dark:text-indigo-400"}`}>
+                      {member.progress}%
+                    </span>
+                  </div>
+                  <Progress value={member.progress} className="h-1.5" />
+                  <p className="text-[10px] text-slate-400 text-right mt-1 font-medium">Pending: {member.pendingTasks}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </CardContent>
       </Card>
 
-      {/* Activity feed */}
       <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
@@ -354,16 +348,15 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* Modal Konfirmasi Rebalance */}
       <Dialog open={rebalanceModal} onOpenChange={setRebalanceModal}>
         <DialogContent className="max-w-xl bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 rounded-2xl border dark:border-slate-800">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl text-slate-900 dark:text-slate-50"><Shuffle className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />Rebalance Preview</DialogTitle>
-            <DialogDescription className="dark:text-slate-400">AI will redistribute tasks to balance workload in <span className="font-semibold text-slate-700 dark:text-slate-300">{activeTeam}</span></DialogDescription>
+            <DialogDescription className="dark:text-slate-400">AI will redistribute pending tasks to balance workload in <span className="font-semibold text-slate-700 dark:text-slate-300">{activeTeam}</span></DialogDescription>
           </DialogHeader>
           <div className="space-y-5 py-4 border-t border-slate-100 dark:border-slate-800 mt-2">
             <div className="space-y-3">
-              <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300">From (Overloaded)</h4>
+              <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300">From (Highest Pending)</h4>
               <div className="p-4 rounded-xl border border-red-200 bg-red-50/50 dark:border-red-900/40 dark:bg-red-950/20">
                 <div className="flex items-center gap-4">
                   <Avatar className="w-12 h-12 border border-red-100 dark:border-red-900">
@@ -373,14 +366,14 @@ export function Dashboard() {
                   </Avatar>
                   <div className="flex-1">
                     <p className="font-semibold text-slate-900 dark:text-slate-100">{overloaded?.name}</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Current: <span className="text-red-600 dark:text-red-400 font-medium">{overloaded?.workload}%</span> → Target: <span className="text-green-600 dark:text-green-400 font-medium">45%</span></p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Current Pending: <span className="text-red-600 dark:text-red-400 font-medium">{overloaded?.pendingTasks} tasks</span></p>
                   </div>
-                  <Badge variant="destructive" className="px-3 py-1">-2 tasks</Badge>
+                  <Badge variant="destructive" className="px-3 py-1">Will Relinquish</Badge>
                 </div>
               </div>
             </div>
             <div className="space-y-3">
-              <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300">To (Available Capacity)</h4>
+              <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300">To (Lowest Pending / Free)</h4>
               <div className="p-4 rounded-xl border border-green-200 bg-green-50/50 dark:border-green-900/40 dark:bg-green-950/20">
                 <div className="flex items-center gap-4">
                   <Avatar className="w-12 h-12 border border-green-100 dark:border-green-900">
@@ -390,9 +383,9 @@ export function Dashboard() {
                   </Avatar>
                   <div className="flex-1">
                     <p className="font-semibold text-slate-900 dark:text-slate-100">{under?.name}</p>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">Current: <span className="text-blue-600 dark:text-blue-400 font-medium">{under?.workload}%</span> → Target: <span className="text-green-600 dark:text-green-400 font-medium">42%</span></p>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">Current Pending: <span className="text-blue-600 dark:text-blue-400 font-medium">{under?.pendingTasks} tasks</span></p>
                   </div>
-                  <Badge className="bg-green-600 px-3 py-1">+2 tasks</Badge>
+                  <Badge className="bg-green-600 px-3 py-1">Will Receive</Badge>
                 </div>
               </div>
             </div>
