@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import {
@@ -26,42 +25,45 @@ import type { ApiChannel, ApiChat } from "../../api/chatApi";
  
 // ─── Types ────────────────────────────────────────────────────────────────────
  
+// ✅ PERBAIKAN: Interface dibuat fleksibel untuk menangkap data Backend
 interface TeamMember {
-  id?: string;       // alias untuk user_id
-  user_id: string;   // field asli dari backend
-  name: string;
-  email: string;
-  role: "admin" | "member";
-  avatarSeed: string;
-  joinDate: string;
+  id?: string;       
+  user_id?: string;   
+  UserId?: string;
+  name?: string;
+  user_full_name?: string;
+  email?: string;
+  role?: string;
+  user_role?: string;
+  role_name?: string;
+  RoleName?: string;
 }
  
 interface Team {
-  id: string;   // = group_id di backend
+  id?: string;   
+  group_id?: string;
   name: string;
-  description: string;
-  inviteCode: string;
+  description?: string;
+  inviteCode?: string;
   members: TeamMember[];
-  bigTasks: unknown[];
+  bigTasks?: unknown[];
 }
  
 interface Channel {
-  id: string;       // channel_id
+  id: string;       
   name: string;
   isPrivate: boolean;
   isDefault: boolean;
 }
  
 interface Message {
-  id: string;       // chat_id
-  userId: string;   // user_id — untuk cek isOwn & operasi edit/delete
-  user: string;     // user_full_name
+  id: string;       
+  userId: string;   
+  user: string;     
   message: string;
   time: string;
   isOwn: boolean;
 }
- 
-const STATUS_CYCLE = ["online", "online", "away", "online", "offline"] as const;
  
 // ─── Converters ───────────────────────────────────────────────────────────────
  
@@ -88,7 +90,6 @@ const toMessage = (a: ApiChat, currentUserId: string): Message => ({
 export function Chat() {
   const navigate = useNavigate();
  
-  // currentUser ditambahkan di Layout.tsx — berisi id & name dari localStorage
   const { activeTeam, teams, currentUser } = useOutletContext<{
     activeTeam: string;
     teams: Team[];
@@ -97,8 +98,10 @@ export function Chat() {
  
   const activeTeamData = teams.find((t) => t.name === activeTeam);
   const members: TeamMember[] = activeTeamData?.members ?? [];
-  const groupId = activeTeamData?.id ?? "";   // group_id untuk semua API call
-  const userId  = currentUser?.id ?? "";      // user_id untuk semua API call
+  
+  // ✅ PERBAIKAN: Menangkap ID Group dengan aman
+  const groupId = activeTeamData?.group_id || activeTeamData?.id || "";   
+  const userId  = currentUser?.id ?? "";      
  
   // ── State ──────────────────────────────────────────────────────────────────
  
@@ -107,19 +110,16 @@ export function Chat() {
   const [activeChannelId,  setActiveChannelId]  = useState<string>("");
   const [message,          setMessage]          = useState("");
  
-  // Loading & error
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sendingMsg,      setSendingMsg]      = useState(false);
   const [apiError,        setApiError]        = useState<string | null>(null);
  
-  // Create channel
   const [createOpen,  setCreateOpen]  = useState(false);
   const [channelName, setChannelName] = useState("");
   const [nameError,   setNameError]   = useState("");
   const [creatingCh,  setCreatingCh]  = useState(false);
  
-  // Edit message
   const [editingMsgId,   setEditingMsgId]   = useState<string | null>(null);
   const [editingMsgText, setEditingMsgText] = useState("");
   const [savingEdit,     setSavingEdit]     = useState(false);
@@ -138,7 +138,6 @@ export function Chat() {
       const res = await channelApi.getByGroup(groupId);
       const list = (res.data ?? []).map(toChannel);
       setChannels(list);
-      // Tetap di channel yang sama jika masih ada, kalau tidak ambil yang pertama
       setActiveChannelId((prev) =>
         list.find((c) => c.id === prev) ? prev : list[0]?.id ?? ""
       );
@@ -186,14 +185,11 @@ export function Chat() {
  
   // ── Helpers ────────────────────────────────────────────────────────────────
  
-  const statusColor = (idx: number) => {
-    const s = STATUS_CYCLE[idx % STATUS_CYCLE.length];
-    return s === "online" ? "bg-green-500" : s === "away" ? "bg-yellow-500" : "bg-gray-400";
-  };
-  const statusLabel = (idx: number) => STATUS_CYCLE[idx % STATUS_CYCLE.length];
-  const initials    = (name: string) =>
-    name.split(" ").map((n) => n[0]).join("").toUpperCase();
-  const slugify     = (s: string) =>
+  // ✅ PERBAIKAN: Fungsi inisial dibuat lebih aman untuk menghindari error jika nama kosong
+  const initials = (name: string) =>
+    (name || "U").trim().split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase();
+    
+  const slugify = (s: string) =>
     s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
  
   // ── Send message ───────────────────────────────────────────────────────────
@@ -202,7 +198,6 @@ export function Chat() {
     if (!message.trim() || !selectedChannel || !groupId || !userId) return;
     setSendingMsg(true);
  
-    // Optimistic update agar UI terasa cepat
     const optimistic: Message = {
       id: `opt-${Date.now()}`,
       userId,
@@ -216,10 +211,8 @@ export function Chat() {
  
     try {
       await chatApi.send(groupId, userId, activeChannelId, optimistic.message);
-      // Refresh untuk dapat chat_id asli dari server
       await fetchMessages();
     } catch (err: unknown) {
-      // Rollback jika gagal
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
       setApiError(err instanceof Error ? err.message : "Gagal mengirim pesan");
     } finally {
@@ -271,7 +264,6 @@ export function Chat() {
     const slug = slugify(channelName);
     if (channels.some((c) => c.name === slug)) { setNameError(`#${slug} already exists.`); return; }
  
-    // Guard: pastikan session valid sebelum hit API
     if (!groupId) { setNameError("No active team selected. Please select a team first."); return; }
     if (!userId)  { setNameError("Session expired. Please log in again."); return; }
  
@@ -669,39 +661,33 @@ export function Chat() {
                 {members.length === 0 ? (
                   <p className="text-center text-xs text-slate-400 py-8">No members in this team</p>
                 ) : (
-                  <div className="space-y-1">
-                    {(["online", "away", "offline"] as const).map((group) => {
-                      const grouped = members.filter((_, i) => statusLabel(i) === group);
-                      if (!grouped.length) return null;
+                  <div className="space-y-1 pt-2">
+                    {members.map((member) => {
+                      // Ambil data dengan aman mengikuti berbagai kemungkinan struktur Backend
+                      const memId = member.user_id || member.UserId || member.id;
+                      const memName = member.user_full_name || member.name || "Unknown User";
+                      const rawRole = String(member.user_role || member.role || member.role_name || member.RoleName || "").toLowerCase();
+                      const displayRole = (rawRole === "a" || rawRole.includes("admin")) ? "Admin" : "Member";
+
                       return (
-                        <div key={group}>
-                          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">
-                            {group} — {grouped.length}
-                          </p>
-                          {grouped.map((member) => {
-                            const idx = members.indexOf(member);
-                            return (
-                              <div
-                                key={member.user_id ?? member.id}
-                                className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-                              >
-                                <div className="relative shrink-0">
-                                  <Avatar className="w-8 h-8">
-                                    <AvatarFallback className="text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
-                                      {initials(member.name)}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div className={`absolute bottom-0 right-0 w-2.5 h-2.5 ${statusColor(idx)} rounded-full border-2 border-white dark:border-slate-900`} />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-xs font-medium truncate">{member.name}</p>
-                                  <p className="text-[10px] text-slate-400 capitalize truncate">
-                                    {member.role === "admin" ? "Admin" : "Member"}
-                                  </p>
-                                </div>
-                              </div>
-                            );
-                          })}
+                        <div
+                          key={memId}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                        >
+                          <div className="relative shrink-0">
+                            <Avatar className="w-8 h-8">
+                              <AvatarFallback className="text-xs font-semibold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400">
+                                {initials(memName)}
+                              </AvatarFallback>
+                            </Avatar>
+                            {/* Titik indikator dihapus dari sini */}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-medium truncate">{memName}</p>
+                            <p className="text-[10px] text-slate-400 capitalize truncate">
+                              {displayRole}
+                            </p>
+                          </div>
                         </div>
                       );
                     })}
@@ -716,4 +702,3 @@ export function Chat() {
     </div>
   );
 }
- 

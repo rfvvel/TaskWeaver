@@ -137,7 +137,7 @@ export function Dashboard() {
   
   const currentUserData = members.find(m => String(m.user_id) === String(currentUserId) || String(m.UserId) === String(currentUserId));
   const rawRole = String(currentUserData?.user_role || currentUserData?.role || currentUserData?.role_name || currentUserData?.RoleName || "").toLowerCase();
-  const isUserAdmin = rawRole.includes("admin");
+  const isUserAdmin = rawRole === "a" || rawRole.includes("admin");
 
   const totalMyTasks = myTasks.length; 
   const completedMyTasks = myTasks.filter(t => t.status === "completed" || t.status === "C").length;
@@ -146,10 +146,12 @@ export function Dashboard() {
 
   const membersWL = members.map((m, i) => {
     const w = getWL(i); 
+    const rRole = String(m.user_role || m.role || "").toLowerCase();
+    const displayRole = (rRole === "a" || rRole.includes("admin")) ? "Admin" : "Member";
     return { 
       id: m.user_id || m.UserId, 
       name: m.user_full_name || m.name || `Member ${i+1}`, 
-      role: m.user_role || m.role || "Member", 
+      role: displayRole, 
       workload: w, 
       wStatus: getWS(w), 
       tasks: Math.floor(w / 10) 

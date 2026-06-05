@@ -94,7 +94,6 @@ export default function LoginPage() {
     setServerError("");
 
     try {
-      // Step 1: Login
       const response = await fetch("http://localhost:3000/api/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -111,10 +110,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Save user data
       localStorage.setItem("user", JSON.stringify(result.data));
 
-      // Check group
       const userId =
         result.data?.UserID ||
         result.data?.user_id ||
@@ -173,7 +170,6 @@ export default function LoginPage() {
           </span>
         </div>
 
-        {/* Login Card */}
         <div className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-8">
 
           <h2 className="text-2xl font-bold text-slate-900 mb-2">
@@ -184,7 +180,6 @@ export default function LoginPage() {
             Please enter your details to sign in.
           </p>
 
-          {/* Error Message */}
           {serverError && (
             <div className="p-3 mb-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200">
               {serverError}

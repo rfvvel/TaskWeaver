@@ -140,7 +140,7 @@ export function Layout() {
                           user_id:    uid,
                           name:       m.user_full_name ?? m.name ?? "Unknown",
                           email:      m.user_email ?? m.email ?? "",
-                          role:       (role === "admin" ? "admin" : "member") as "admin" | "member",
+                          role:       (role === "admin" || role === "a" ? "admin" : "member") as "admin" | "member",
                           avatarSeed: uid,
                           joinDate:   m.joined_at ?? "",
                         };
