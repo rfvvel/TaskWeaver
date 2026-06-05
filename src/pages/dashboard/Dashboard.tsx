@@ -126,7 +126,6 @@ export function Dashboard() {
   const pendingMyTasks = myTasks.filter(t => t.status !== "completed" && t.status !== "C");
   const progressPercent = totalMyTasks > 0 ? Math.round((completedMyTasks / totalMyTasks) * 100) : 0;
 
-  // Kalkulasi Workload Murni dari Database
   const memberStats = members.map((m) => {
     const memId = String(m.user_id || m.UserId);
     const mTasks = teamTasks.filter(t => String(t.user_id || t.UserId) === memId);
@@ -148,12 +147,11 @@ export function Dashboard() {
       role: displayRole, 
       totalTasks: mTotal,
       completedTasks: mComplete,
-      pendingTasks: mPending, // Sisa tugas yang belum dikerjakan
+      pendingTasks: mPending, 
       progress: mProgress
     };
   });
 
-  // Pencarian untuk Modal Rebalance (Urutkan dari yang sisa tugasnya terbanyak)
   const sortedByPending = [...memberStats].sort((a, b) => b.pendingTasks - a.pendingTasks);
   const overloaded = sortedByPending[0]; 
   const under = sortedByPending[sortedByPending.length - 1]; 
@@ -197,6 +195,46 @@ export function Dashboard() {
     );
   }
 
+  // DEFINISI DATA METRIK UNTUK MENANGANI REDIRECT & WARNA KARTU SECARA DINAMIS (ALL BLUE ACCENT)
+  const metricCards = [
+    { 
+      label: "Team Members", 
+      value: membersCount.toString(), 
+      sub: "Total enrolled", 
+      Icon: Users, 
+      accent: "bg-blue-500",
+      path: "/team-management",
+      title: "View Team Management"
+    },
+    { 
+      label: "Total Tasks", 
+      value: totalMyTasks.toString(), 
+      sub: "Total my tasks", 
+      Icon: Target, 
+      accent: "bg-blue-500",
+      path: "/tasks",
+      title: "View My Tasks"
+    },
+    { 
+      label: "My Progress", 
+      value: `${progressPercent}%`, 
+      sub: `${completedMyTasks} of ${totalMyTasks} done`, 
+      Icon: TrendingUp, 
+      accent: "bg-blue-500",
+      path: "/activity",
+      title: "View Team Activity"
+    },
+    { 
+      label: "My Deadlines", 
+      value: pendingMyTasks.length.toString(), 
+      sub: "Tasks left to do", 
+      Icon: CalendarIcon, 
+      accent: "bg-blue-500",
+      path: "/calendar",
+      title: "View Calendar"
+    },
+  ];
+
   return (
     <div className="p-6 space-y-6 max-w-7xl mx-auto">
       <div className="flex items-start justify-between">
@@ -212,14 +250,15 @@ export function Dashboard() {
         </Badge>
       </div>
 
+      {/* 📊 GRID KARTU METRIK UTAMA DENGAN WARNA SERAGAM BIRU */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Team Members", value: membersCount.toString(), sub: "Total enrolled", Icon: Users, accent: "bg-blue-500" },
-          { label: "Total Tasks", value: totalMyTasks.toString(), sub: "Total my tasks", Icon: Target, accent: "bg-blue-500" },
-          { label: "My Progress", value: `${progressPercent}%`, sub: `${completedMyTasks} of ${totalMyTasks} done`, Icon: TrendingUp, accent: "bg-blue-500" },
-          { label: "My Deadlines", value: pendingMyTasks.length.toString(), sub: "Tasks left to do", Icon: CalendarIcon, accent: "bg-blue-500" },
-        ].map((s, idx) => (
-          <Card key={idx} className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm hover:shadow-md transition-shadow">
+        {metricCards.map((s, idx) => (
+          <Card 
+            key={idx} 
+            onClick={() => navigate(s.path)}
+            className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm transition-all hover:bg-slate-50 dark:hover:bg-slate-850 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md cursor-pointer active:scale-[0.98]"
+            title={s.title}
+          >
             <CardContent className="p-5">
               <div className="flex items-start justify-between">
                 <div className="space-y-1.5">
@@ -227,7 +266,7 @@ export function Dashboard() {
                   <p className="text-3xl font-bold text-slate-900 dark:text-slate-50">{loading ? "-" : s.value}</p>
                   <p className="text-xs text-slate-400 dark:text-slate-500">{s.sub}</p>
                 </div>
-                <div className={`w-11 h-11 rounded-xl ${s.accent} flex items-center justify-center shadow-lg dark:shadow-none`}>
+                <div className={`w-11 h-11 rounded-xl ${s.accent} flex items-center justify-center shadow-lg dark:shadow-none transition-transform group-hover:scale-105`}>
                   <s.Icon className="w-5 h-5 text-white" />
                 </div>
               </div>
@@ -270,7 +309,6 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      
       <Card className="border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
         <CardHeader>
           <div className="flex items-center justify-between">

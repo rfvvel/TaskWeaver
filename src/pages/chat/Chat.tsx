@@ -26,7 +26,6 @@ import { getSocket } from "../../api/socket";
  
 // ─── Types ────────────────────────────────────────────────────────────────────
  
-// ✅ PERBAIKAN: Interface dibuat fleksibel untuk menangkap data Backend
 interface TeamMember {
   id?: string;       
   user_id?: string;   
@@ -100,7 +99,6 @@ export function Chat() {
   const activeTeamData = teams.find((t) => t.name === activeTeam);
   const members: TeamMember[] = activeTeamData?.members ?? [];
   
-  // ✅ PERBAIKAN: Menangkap ID Group dengan aman
   const groupId = activeTeamData?.group_id || activeTeamData?.id || "";   
   const userId  = currentUser?.id ?? "";      
  
@@ -175,14 +173,14 @@ export function Chat() {
     setMessages([]);
     fetchMessages();
   }, [fetchMessages]);
-
+ 
   // ── Real-time: dengarkan pesan baru di channel aktif ─────────────────────────
-
+ 
   useEffect(() => {
     if (!groupId || !activeChannelId) return;
     const socket = getSocket();
     socket.emit("joinChannel", { group_id: groupId, channel_id: activeChannelId });
-
+ 
     const onNew = (payload: ApiChat) => {
       if (String(payload.channel_id) !== String(activeChannelId)) return;
       setMessages((prev) =>
@@ -192,13 +190,13 @@ export function Chat() {
       );
     };
     socket.on("chat:new", onNew);
-
+ 
     return () => {
       socket.emit("leaveChannel", { group_id: groupId, channel_id: activeChannelId });
       socket.off("chat:new", onNew);
     };
   }, [groupId, activeChannelId, userId]);
-
+ 
   // ── Auto scroll ────────────────────────────────────────────────────────────
  
   useEffect(() => {
@@ -209,7 +207,6 @@ export function Chat() {
  
   // ── Helpers ────────────────────────────────────────────────────────────────
  
-  // ✅ PERBAIKAN: Fungsi inisial dibuat lebih aman untuk menghindari error jika nama kosong
   const initials = (name: string) =>
     (name || "U").trim().split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase();
     
@@ -316,8 +313,6 @@ export function Chat() {
     }
   };
  
-  // ── No teams guard ─────────────────────────────────────────────────────────
- 
   if (teams.length === 0) {
     return (
       <div className="p-6 h-[calc(100vh-8rem)] flex items-center justify-center bg-slate-50 dark:bg-slate-950">
@@ -342,12 +337,9 @@ export function Chat() {
     );
   }
  
-  // ── Render ─────────────────────────────────────────────────────────────────
- 
   return (
     <div className="p-6 bg-slate-50 dark:bg-slate-950 min-h-screen">
  
-      {/* ── Error banner ── */}
       {apiError && (
         <div className="mb-3 flex items-center gap-2 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm px-4 py-2.5 rounded-xl">
           <AlertCircle className="w-4 h-4 shrink-0" />
@@ -358,7 +350,6 @@ export function Chat() {
         </div>
       )}
  
-      {/* ── Create Channel Dialog ── */}
       <Dialog open={createOpen} onOpenChange={(open) => {
         setCreateOpen(open);
         if (!open) { setChannelName(""); setNameError(""); }
@@ -418,7 +409,6 @@ export function Chat() {
         </DialogContent>
       </Dialog>
  
-      {/* ── Main Card ── */}
       <Card className="border-slate-200 dark:border-slate-800 shadow-sm h-[calc(100vh-8rem)] bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
         <CardContent className="p-0 h-full">
           <div className="flex h-full">
@@ -514,7 +504,6 @@ export function Chat() {
             <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 dark:bg-slate-950/20 border-r border-slate-200 dark:border-slate-800">
               {selectedChannel ? (
                 <>
-                  {/* Channel header */}
                   <div className="h-16 border-b border-slate-200 dark:border-slate-800 px-5 flex items-center justify-between shrink-0 bg-white dark:bg-slate-900">
                     <div className="flex items-center gap-2 min-w-0">
                       <Hash className="w-4 h-4 text-slate-400 shrink-0" />
@@ -522,7 +511,6 @@ export function Chat() {
                     </div>
                   </div>
  
-                  {/* Messages */}
                   <div ref={scrollRef} className="flex-1 overflow-y-auto p-5">
                     {loadingMessages ? (
                       <div className="flex items-center justify-center h-full">
@@ -546,11 +534,11 @@ export function Chat() {
                             <div className={`flex-1 max-w-[70%] ${msg.isOwn ? "flex flex-col items-end" : ""}`}>
                               <div className={`flex items-center gap-2 mb-1 ${msg.isOwn ? "flex-row-reverse" : ""}`}>
                                 <span className="text-xs text-slate-400">{msg.user}</span>
-                                <span className="text-xs text-slate-300 dark:text-slate-600">{msg.time}</span>
+                                {/* ✅ PERBAIKAN: Menambahkan utilitas font-semibold untuk ketebalan teks waktu */}
+                                <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{msg.time}</span>
                               </div>
  
                               {editingMsgId === msg.id ? (
-                                /* Inline edit input */
                                 <div className="flex items-center gap-2 w-full">
                                   <Input
                                     value={editingMsgText}
@@ -578,7 +566,6 @@ export function Chat() {
                                 </div>
                               ) : (
                                 <div className="flex items-end gap-1.5 group/bubble">
-                                  {/* Edit & delete — hanya muncul untuk pesan milik sendiri saat hover */}
                                   {msg.isOwn && (
                                     <div className="flex gap-1 opacity-0 group-hover/bubble:opacity-100 transition-opacity mb-0.5">
                                       <button
@@ -631,7 +618,6 @@ export function Chat() {
                     )}
                   </div>
  
-                  {/* Input bar */}
                   <div className="p-4 border-t border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
                     <div className="flex items-center gap-2">
                       <Input
@@ -687,12 +673,11 @@ export function Chat() {
                 ) : (
                   <div className="space-y-1 pt-2">
                     {members.map((member) => {
-                      // Ambil data dengan aman mengikuti berbagai kemungkinan struktur Backend
                       const memId = member.user_id || member.UserId || member.id;
                       const memName = member.user_full_name || member.name || "Unknown User";
                       const rawRole = String(member.user_role || member.role || member.role_name || member.RoleName || "").toLowerCase();
                       const displayRole = (rawRole === "a" || rawRole.includes("admin")) ? "Admin" : "Member";
-
+ 
                       return (
                         <div
                           key={memId}
@@ -704,7 +689,6 @@ export function Chat() {
                                 {initials(memName)}
                               </AvatarFallback>
                             </Avatar>
-                            {/* Titik indikator dihapus dari sini */}
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className="text-xs font-medium truncate">{memName}</p>

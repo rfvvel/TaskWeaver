@@ -15,26 +15,38 @@ interface BigTask { id: string; title: string; status: "todo" | "in-progress" | 
 interface TeamMember { id: string; name: string; email: string; role: "admin" | "member"; avatarSeed: string; joinDate: string; }
 interface Team { id: string; name: string; description: string; inviteCode: string; members: TeamMember[]; bigTasks: BigTask[]; }
 
-// ✅ Fungsi untuk memformat tanggal agar cantik (misal: "May 31, 2026")
 const formatDate = (dateStr: string) => {
   if (!dateStr) return "No Date";
   const d = new Date(dateStr);
   return isNaN(d.getTime()) ? "Invalid Date" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
+// ─── FIX: Robust user ID resolution from localStorage ───────────────────────
+// Handles all possible key casings that may come from different login flows
+const resolveUserId = (user: Record<string, any>): string | null => {
+  const id =
+    user?.UserID ??
+    user?.userId ??
+    user?.user_id ??
+    user?.id ??
+    user?.ID ??
+    null;
+  return id != null ? String(id) : null;
+};
+
 export function TeamManagement() {
   const navigate = useNavigate();
-  
-  const { teams, setTeams, activeTeam, setActiveTeam } = useOutletContext<{ 
-    teams: Team[], setTeams: (t: Team[]) => void, 
-    activeTeam: string, setActiveTeam: (t: string) => void 
+
+  const { teams, setTeams, activeTeam, setActiveTeam } = useOutletContext<{
+    teams: Team[], setTeams: (t: Team[]) => void,
+    activeTeam: string, setActiveTeam: (t: string) => void
   }>();
 
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  
-  const [joinDialogOpen, setJoinDialogOpen] = useState(false); 
+
+  const [joinDialogOpen, setJoinDialogOpen] = useState(false);
   const [inviteCodeInput, setInviteCodeInput] = useState("");
   const [joinCodeError, setJoinCodeError] = useState("");
   const [isJoining, setIsJoining] = useState(false);
@@ -43,130 +55,137 @@ export function TeamManagement() {
   const [newTeamName, setNewTeamName] = useState("");
   const [newTeamDesc, setNewTeamDesc] = useState("");
   const [teamNameError, setTeamNameError] = useState("");
+  const [isCreating, setIsCreating] = useState(false);
 
-  const getLoggedInUser = () => {
-    const userStr = localStorage.getItem("user");
-    return userStr ? JSON.parse(userStr) : null;
+  const getLoggedInUser = (): Record<string, any> | null => {
+    try {
+      const userStr = localStorage.getItem("user");
+      return userStr ? JSON.parse(userStr) : null;
+    } catch {
+      return null;
+    }
   };
 
-  useEffect(() => {
-    const fetchUserTeams = async () => {
-      const user = getLoggedInUser();
-      if (!user) return;
-      const userId = user.UserID || user.id || user.user_id;
+  const fetchUserTeams = async () => {
+    const user = getLoggedInUser();
+    if (!user) return;
 
-      try {
-        const response = await fetch("http://localhost:3000/api/groupGetGroupByUserId", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ user_id: userId })
-        });
+    // FIX: use robust resolveUserId instead of one-liner chain
+    const userId = resolveUserId(user);
+    if (!userId) {
+      console.error("[TeamManagement] fetchUserTeams: cannot resolve userId from", user);
+      return;
+    }
 
-        const result = await response.json();
+    try {
+      const response = await fetch("http://localhost:3000/api/groupGetGroupByUserId", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: userId })
+      });
 
-        if (response.ok && result.status === "sukses") {
-          const teamsWithMembers = await Promise.all(result.data.map(async (g: any) => {
-            let membersList: TeamMember[] = [];
-            let bigTasksList: BigTask[] = []; // ✅ Wadah untuk task besar
-            
-            // 1. Ambil Data Members
+      const result = await response.json();
+
+      if (response.ok && result.status === "sukses") {
+        const teamsWithMembers = await Promise.all(result.data.map(async (g: any) => {
+          let membersList: TeamMember[] = [];
+          let bigTasksList: BigTask[] = [];
+
+          try {
+            const memRes = await fetch("http://localhost:3000/api/groupGetMember", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ group_id: g.group_id })
+            });
+            const memData = await memRes.json();
+
+            if (memRes.ok && memData.status === "sukses") {
+              membersList = memData.data.map((m: any) => ({
+                id: String(m.user_id),
+                name: m.user_full_name || m.name || "Unknown User",
+                email: m.user_email || "No Email",
+                role: m.user_role === 'A' ? "admin" : "member",
+                avatarSeed: m.user_full_name || "U",
+                joinDate: m.join_date || "Joined recently"
+              }));
+            }
+          } catch (e) {
+            console.error(`Gagal mengambil member untuk grup ${g.group_id}`, e);
+          }
+
+          try {
+            const taskRes = await fetch("http://localhost:3000/api/taskGetByGroup", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ Group_Id: g.group_id })
+            });
+            const taskData = await taskRes.json();
+
+            if (taskRes.ok && taskData.status === "sukses" && taskData.data) {
+              bigTasksList = taskData.data.map((t: any) => ({
+                id: String(t.task_id || t.TaskId),
+                title: t.task_title || t.TaskName,
+                status: t.task_status || t.status || "todo",
+                deadline: t.deadline || t.TaskDeadline
+              }));
+            }
+          } catch (e) {
+            console.error(`Gagal mengambil task untuk grup ${g.group_id}`, e);
+          }
+
+          let inviteCode = g.group_invite_code || g.group_invitecode || g.invite_code || null;
+          if (!inviteCode) {
             try {
-              const memRes = await fetch("http://localhost:3000/api/groupGetMember", {
+              const invRes = await fetch("http://localhost:3000/api/groupGetInviteCode", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ group_id: g.group_id })
               });
-              const memData = await memRes.json();
-              
-              if (memRes.ok && memData.status === "sukses") {
-                membersList = memData.data.map((m: any) => ({
-                    id: String(m.user_id),
-                    name: m.user_full_name || m.name || "Unknown User", 
-                    email: m.user_email || "No Email",
-                    role: m.user_role === 'A' ? "admin" : "member",
-                    avatarSeed: m.user_full_name || "U",
-                    joinDate: m.join_date || "Joined recently"
-                }));
+              const invData = await invRes.json();
+              if (invRes.ok && invData.status === "sukses" && invData.data?.[0]) {
+                inviteCode = invData.data[0].group_invitecode
+                  || invData.data[0].invite_code
+                  || invData.data[0].group_invite_code
+                  || null;
               }
             } catch (e) {
-              console.error(`Gagal mengambil member untuk grup ${g.group_id}`, e);
+              console.error(`Gagal mengambil invite code untuk grup ${g.group_id}`, e);
             }
-
-            // 2. ✅ Ambil Data Big Tasks dari Database
-            try {
-              const taskRes = await fetch("http://localhost:3000/api/taskGetByGroup", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ Group_Id: g.group_id })
-              });
-              const taskData = await taskRes.json();
-              
-              if (taskRes.ok && taskData.status === "sukses" && taskData.data) {
-                bigTasksList = taskData.data.map((t: any) => ({
-                  id: String(t.task_id || t.TaskId),
-                  title: t.task_title || t.TaskName,
-                  status: t.task_status || t.status || "todo",
-                  deadline: t.deadline || t.TaskDeadline
-                }));
-              }
-            } catch (e) {
-              console.error(`Gagal mengambil task untuk grup ${g.group_id}`, e);
-            }
-
-            // 3. Ambil Data Invite Code
-            let inviteCode = g.group_invite_code || g.group_invitecode || g.invite_code || null;
-            if (!inviteCode) {
-              try {
-                const invRes = await fetch("http://localhost:3000/api/groupGetInviteCode", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ group_id: g.group_id })
-                });
-                const invData = await invRes.json();
-                if (invRes.ok && invData.status === "sukses" && invData.data?.[0]) {
-                  inviteCode = invData.data[0].group_invitecode 
-                            || invData.data[0].invite_code 
-                            || invData.data[0].group_invite_code 
-                            || null;
-                }
-              } catch (e) {
-                console.error(`Gagal mengambil invite code untuk grup ${g.group_id}`, e);
-              }
-            }
-
-            return {
-              id: String(g.group_id),
-              name: g.group_name,
-              description: g.group_description || "No description provided.",
-              inviteCode: inviteCode || "No invite code",
-              members: membersList,
-              bigTasks: bigTasksList 
-            };
-          }));
-
-          setTeams(teamsWithMembers);
-
-          if (teamsWithMembers.length > 0 && !activeTeam) {
-            setActiveTeam(teamsWithMembers[0].name);
-            localStorage.setItem("tw_activeTeam", teamsWithMembers[0].name);
           }
-        }
-      } catch (error) {
-        console.error("Gagal memproses data workspace:", error);
-      }
-    };
 
+          return {
+            id: String(g.group_id),
+            name: g.group_name,
+            description: g.group_description || "No description provided.",
+            inviteCode: inviteCode || "No invite code",
+            members: membersList,
+            bigTasks: bigTasksList
+          };
+        }));
+
+        setTeams(teamsWithMembers);
+
+        if (teamsWithMembers.length > 0 && !activeTeam) {
+          setActiveTeam(teamsWithMembers[0].name);
+          localStorage.setItem("tw_activeTeam", teamsWithMembers[0].name);
+        }
+      }
+    } catch (error) {
+      console.error("Gagal memproses data workspace:", error);
+    }
+  };
+
+  useEffect(() => {
     fetchUserTeams();
   }, []);
 
   const openTeamTasks = (team: Team) => { setSelectedTeam(team); setTaskDialogOpen(true); };
-  
-  // ✅ Perbaikan: Navigate ke task management dan set active team
-  const goToTaskManagement = (teamName: string) => { 
+
+  const goToTaskManagement = (teamName: string) => {
     setActiveTeam(teamName);
     localStorage.setItem("tw_activeTeam", teamName);
-    setTaskDialogOpen(false); 
-    navigate("/task-management"); 
+    setTaskDialogOpen(false);
+    navigate("/task-management");
   };
 
   const handleCreateTaskForTeam = (teamName: string) => {
@@ -186,16 +205,22 @@ export function TeamManagement() {
       alert("Login session lost. Please log in again.");
       return;
     }
-    const userId = user.UserID || user.id || user.user_id;
+
+    // FIX: use robust resolveUserId
+    const userId = resolveUserId(user);
+    if (!userId) {
+      alert("Gagal mendapatkan User ID. Coba logout dan login kembali.");
+      return;
+    }
 
     try {
       const response = await fetch("http://localhost:3000/api/groupKick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ 
-          group_id: teamId, 
-          user_id: userId, 
-          user_requester_id: userId 
+        body: JSON.stringify({
+          group_id: teamId,
+          user_id: userId,
+          user_requester_id: userId
         })
       });
 
@@ -204,9 +229,9 @@ export function TeamManagement() {
       if (response.ok && result.status === "sukses") {
         const teamToLeave = teams.find(t => t.id === teamId);
         const updatedTeams = teams.filter(team => team.id !== teamId);
-        
-        setTeams(updatedTeams); 
-        
+
+        setTeams(updatedTeams);
+
         if (teamToLeave?.name === activeTeam) {
           const nextTeam = updatedTeams.length > 0 ? updatedTeams[0].name : "No Team";
           setActiveTeam(nextTeam);
@@ -216,7 +241,7 @@ export function TeamManagement() {
             localStorage.removeItem("tw_activeTeam");
           }
         }
-        
+
         alert("Berhasil keluar dari tim!");
       } else {
         alert(result.pesan || "Gagal keluar dari tim.");
@@ -241,7 +266,13 @@ export function TeamManagement() {
 
     const user = getLoggedInUser();
     if (!user) return;
-    const userId = user.UserID || user.id || user.user_id;
+
+    // FIX: use robust resolveUserId
+    const userId = resolveUserId(user);
+    if (!userId) {
+      setJoinCodeError("Gagal mendapatkan User ID. Coba logout dan login kembali.");
+      return;
+    }
 
     setIsJoining(true);
     setJoinCodeError("");
@@ -285,37 +316,79 @@ export function TeamManagement() {
     }
   };
 
-  const handleCreateTeam = () => {
-    if (!newTeamName.trim()) { setTeamNameError("Team Name tidak boleh kosong!"); return; }
+  const handleCreateTeam = async () => {
+    if (!newTeamName.trim()) {
+      setTeamNameError("Team Name tidak boleh kosong!");
+      return;
+    }
 
     const loggedInUser = getLoggedInUser();
-    const userId = loggedInUser ? String(loggedInUser.UserID || loggedInUser.id || loggedInUser.user_id || `m-${Date.now()}`) : `m-${Date.now()}`;
-    const userName = loggedInUser ? (loggedInUser.user_fullname || loggedInUser.UserFullName || loggedInUser.username || loggedInUser.name || "Unknown User") : "Unknown User";
-    const userEmail = loggedInUser ? (loggedInUser.user_email || loggedInUser.UserEmail || loggedInUser.email || "No Email") : "No Email";
+    if (!loggedInUser) {
+      alert("Sesi login habis atau tidak ditemukan. Silakan login kembali.");
+      return;
+    }
 
-    const newTeam: Team = {
-      id: `team-${Date.now()}`, 
-      name: newTeamName, 
-      description: newTeamDesc || "No description provided.", 
-      inviteCode: generateRandomCode(), 
-      bigTasks: [],
-      members: [ 
-        { 
-          id: userId, 
-          name: userName, 
-          email: userEmail, 
-          role: "admin", 
-          avatarSeed: userName, 
-          joinDate: `Joined ${new Date().toLocaleDateString()}` 
-        } 
-      ]
-    };
+    // FIX: use robust resolveUserId — this was the primary cause of data not saving
+    const userId = resolveUserId(loggedInUser);
+    if (!userId) {
+      alert(`Gagal mendapatkan User ID. Data user di localStorage: ${JSON.stringify(loggedInUser)}. Coba logout dan login kembali.`);
+      return;
+    }
 
-    setTeams([...teams, newTeam]);
-    setActiveTeam(newTeam.name);
-    setCreateDialogOpen(false); 
-    setNewTeamName(""); 
-    setNewTeamDesc("");
+    const generatedCode = generateRandomCode();
+
+    setIsCreating(true);
+    setTeamNameError("");
+
+    try {
+      console.log("[TeamManagement] handleCreateTeam payload:", {
+        group_name: newTeamName,
+        user_id: userId,
+        group_description: newTeamDesc || "No description provided.",
+        invite_code: generatedCode
+      });
+
+      const response = await fetch("http://localhost:3000/api/groupCreate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          group_name: newTeamName,
+          user_id: userId,
+          group_description: newTeamDesc || "No description provided.",
+          invite_code: generatedCode
+        })
+      });
+
+      const result = await response.json();
+
+      console.log("[TeamManagement] handleCreateTeam response:", result);
+
+      if (response.ok && result.status === "sukses") {
+        // Close dialog and reset form
+        setCreateDialogOpen(false);
+        setNewTeamName("");
+        setNewTeamDesc("");
+
+        setActiveTeam(newTeamName);
+        localStorage.setItem("tw_activeTeam", newTeamName);
+
+        // Refresh teams list from database
+        await fetchUserTeams();
+        alert("Tim baru berhasil dibuat dan disimpan ke database!");
+      } else {
+        // FIX: show the actual server error message to help debugging
+        const errorMsg = result.pesan || result.message || "Gagal membuat tim. Cek console untuk detail.";
+        alert(`Gagal membuat tim: ${errorMsg}`);
+        console.error("[TeamManagement] Create team failed:", result);
+      }
+    } catch (error) {
+      console.error("Error Create Team:", error);
+      alert("Gagal terhubung ke server backend. Pastikan server backend Anda berjalan di port 3000 dan CORS diizinkan.");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
@@ -326,7 +399,7 @@ export function TeamManagement() {
           <p className="text-muted-foreground mt-1 text-slate-500 dark:text-slate-400">Create, join, and manage your teams</p>
         </div>
         <div className="flex gap-3">
-          
+
           <Dialog open={joinDialogOpen} onOpenChange={(open) => { setJoinDialogOpen(open); if (!open) { setInviteCodeInput(""); setJoinCodeError(""); } }}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2 rounded-xl bg-white text-slate-700 hover:bg-slate-50 border-slate-200 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700 dark:hover:bg-slate-700">
@@ -350,7 +423,7 @@ export function TeamManagement() {
                   />
                   {joinCodeError && (
                     <p className="text-xs text-red-500 font-medium flex items-center gap-1">
-                      <span></span> {joinCodeError}
+                      {joinCodeError}
                     </p>
                   )}
                 </div>
@@ -364,7 +437,6 @@ export function TeamManagement() {
             </DialogContent>
           </Dialog>
 
-          {/* Create Team Dialog */}
           <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
             <DialogTrigger asChild>
               <Button className="gap-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-sm"><Plus className="w-4 h-4" /> Create Team</Button>
@@ -396,8 +468,10 @@ export function TeamManagement() {
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="rounded-xl dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Cancel</Button>
-                <Button className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white" onClick={handleCreateTeam} disabled={!newTeamName.trim()}>Create Team</Button>
+                <Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="rounded-xl dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800" disabled={isCreating}>Cancel</Button>
+                <Button className="rounded-xl bg-blue-600 hover:bg-blue-700 text-white" onClick={handleCreateTeam} disabled={!newTeamName.trim() || isCreating}>
+                  {isCreating ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating...</> : "Create Team"}
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -405,7 +479,6 @@ export function TeamManagement() {
         </div>
       </div>
 
-      {/* Big Tasks Dialog */}
       <Dialog open={taskDialogOpen} onOpenChange={setTaskDialogOpen}>
         <DialogContent className="rounded-2xl max-w-lg max-h-[85vh] overflow-y-auto bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800">
           {selectedTeam && (
@@ -431,8 +504,7 @@ export function TeamManagement() {
                     </div>
                   </Card>
                 ))}
-                
-                {/* Tampilan jika task kosong */}
+
                 {selectedTeam.bigTasks.length === 0 && (
                   <div className="text-center py-10 bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-dashed border-slate-300 dark:border-slate-700 flex flex-col items-center">
                     <ClipboardList className="w-12 h-12 text-slate-300 dark:text-slate-600 mb-3" />
@@ -447,7 +519,6 @@ export function TeamManagement() {
         </DialogContent>
       </Dialog>
 
-      {/* Teams Loop List */}
       <div className="space-y-8">
         {teams.map((team) => (
           <Card key={team.id} className="rounded-2xl shadow-sm border-slate-200 dark:border-slate-800 overflow-hidden bg-white dark:bg-slate-900">
@@ -484,8 +555,7 @@ export function TeamManagement() {
                   <TabsTrigger value="members" className="rounded-lg dark:data-[state=active]:bg-slate-700 dark:data-[state=active]:text-white">Members ({team.members.length})</TabsTrigger>
                   <TabsTrigger value="invite" className="rounded-lg dark:data-[state=active]:bg-slate-700 dark:data-[state=active]:text-white">Invite</TabsTrigger>
                 </TabsList>
-                
-                {/* Members Tab Content */}
+
                 <TabsContent value="members" className="space-y-4 focus-visible:outline-none">
                   <div className="space-y-1">
                     {team.members.map((member) => (
@@ -511,8 +581,7 @@ export function TeamManagement() {
                     ))}
                   </div>
                 </TabsContent>
-                
-                {/* Invite Tab Content */}
+
                 <TabsContent value="invite" className="space-y-6 pt-2 focus-visible:outline-none">
                   <div className="p-5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/50 dark:bg-slate-800/20">
                     <Label className="text-sm font-semibold text-slate-700 dark:text-slate-300">Team Invite Code</Label>
@@ -520,9 +589,9 @@ export function TeamManagement() {
                       <code className="flex-1 px-4 py-3 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-lg text-slate-800 dark:text-slate-200 font-bold tracking-widest shadow-sm">
                         {team.inviteCode}
                       </code>
-                      <Button 
-                        variant={copiedCode === team.inviteCode ? "default" : "outline"} 
-                        onClick={() => handleCopyCode(team.inviteCode)} 
+                      <Button
+                        variant={copiedCode === team.inviteCode ? "default" : "outline"}
+                        onClick={() => handleCopyCode(team.inviteCode)}
                         className={`rounded-xl h-12 px-5 transition-all shrink-0 ${copiedCode === team.inviteCode ? 'bg-green-500 text-white hover:bg-green-600' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-700'}`}
                       >
                         {copiedCode === team.inviteCode ? <><Check className="w-4 h-4 mr-2" /> Copied!</> : <><Copy className="w-4 h-4 mr-2" /> Copy Code</>}
@@ -535,7 +604,6 @@ export function TeamManagement() {
           </Card>
         ))}
 
-        {/* Empty State */}
         {teams.length === 0 && (
           <div className="text-center py-20 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
             <Users className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-4" />

@@ -2,11 +2,10 @@ import { useState, useEffect } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, ListTodo, Calendar as CalendarIcon, Activity,
-  FolderOpen, MessageSquare, Settings as SettingsIcon, Search, Bell, ChevronDown,
-  Users, ClipboardList, AlertCircle
+  FolderOpen, MessageSquare, Settings as SettingsIcon, ChevronDown,
+  Users, ClipboardList, Sun, Moon, CalendarDays
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
-import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
@@ -40,7 +39,7 @@ interface Team {
 }
  
 const navItems = [
-  { path: "/dashboard",       label: "Dashboard",      icon: LayoutDashboard },
+  { path: "/dashboard",       label: "Dashboard",       icon: LayoutDashboard },
   { path: "/tasks",           label: "My Tasks",        icon: ListTodo },
   { path: "/calendar",        label: "Calendar",        icon: CalendarIcon },
   { path: "/activity",        label: "Team Activity",   icon: Activity },
@@ -53,9 +52,52 @@ const navItems = [
  
 export function Layout() {
   const location = useLocation();
-  const navigate  = useNavigate();
+  const navigate = useNavigate();
  
-  // ── Ambil Data Profil dari Semua Kemungkinan Key LocalStorage ──────────────────
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [activeTeam, setActiveTeam] = useState<string>("Loading...");
+  const [loading, setLoading] = useState<boolean>(true);
+  
+  // 🌓 STATE UNTUK MODE GELAP / TERANG (DARK MODE)
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    return document.documentElement.classList.contains("dark") || 
+           localStorage.getItem("theme") === "dark";
+  });
+
+  const toggleTheme = () => {
+    if (isDarkMode) {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+      setIsDarkMode(false);
+    } else {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+      setIsDarkMode(true);
+    }
+  };
+  
+  // 🕒 STATE UNTUK JAM & TANGGAL REAL-TIME
+  const [time, setTime] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formattedDate = time.toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+
+  const formattedTime = time.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true
+  });
+ 
   const getUser = () => {
     try { 
       const rawUser = localStorage.getItem("user");
@@ -71,8 +113,19 @@ export function Layout() {
   };
  
   const user = getUser();
-  
-  const userFullName: string = user.UserFullName ?? user.user_full_name ?? localStorage.getItem("name") ?? "User";
+  const [userFullName, setUserFullName] = useState<string>(
+    user.UserFullName ?? user.user_full_name ?? localStorage.getItem("name") ?? "User"
+  );
+
+  // Re-read name whenever Settings saves a profile update
+  useEffect(() => {
+    const handleUserUpdated = () => {
+      const u = getUser();
+      setUserFullName(u.UserFullName ?? u.user_full_name ?? localStorage.getItem("name") ?? "User");
+    };
+    window.addEventListener("tw_user_updated", handleUserUpdated);
+    return () => window.removeEventListener("tw_user_updated", handleUserUpdated);
+  }, []);
  
   const avatarInitials: string =
     userFullName
@@ -86,18 +139,12 @@ export function Layout() {
   const resolvedUserId = user.UserID ?? user.user_id ?? user.id ?? "";
  
   const currentUser = {
-    id:      resolvedUserId,
+    id: resolvedUserId,
     user_id: resolvedUserId,
-    name:    userFullName,
-    email:   user.UserEmail ?? user.email ?? "",
+    name: userFullName,
+    email: user.UserEmail ?? user.email ?? "",
   };
  
-  // ── State Utama ────────────────────────────────────────────────────────────
-  const [teams, setTeams] = useState<Team[]>([]);
-  const [activeTeam, setActiveTeam] = useState<string>("Loading...");
-  const [loading, setLoading] = useState<boolean>(true);
- 
-  // ── Murni Ambil Data Tim + Members Dari Backend ────────────────────────────
   useEffect(() => {
     const fetchUserTeams = async () => {
       setLoading(true);
@@ -113,18 +160,18 @@ export function Layout() {
  
         if (resData && resData.status === "sukses" && Array.isArray(resData.data)) {
           const baseTeams: Team[] = resData.data.map((t: any) => ({
-            group_id:    String(t.group_id ?? ""),
-            name:        t.group_name ?? t.name ?? "",
+            group_id: String(t.group_id ?? ""),
+            name: t.group_name ?? t.name ?? "",
             description: t.group_description ?? t.description ?? "",
-            inviteCode:  t.invite_code ?? "",
-            bigTasks:    [],
-            members:     [],
+            inviteCode: t.invite_code ?? "",
+            bigTasks: [],
+            members: [],
           }));
  
           const teamsWithMembers: Team[] = await Promise.all(
             baseTeams.map(async (team) => {
               try {
-                const mRes  = await fetch("http://localhost:3000/api/groupGetMember", {
+                const mRes = await fetch("http://localhost:3000/api/groupGetMember", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ group_id: team.group_id }),
@@ -133,16 +180,16 @@ export function Layout() {
                 const members: TeamMember[] =
                   mRes.ok && mData.status === "sukses" && Array.isArray(mData.data)
                     ? mData.data.map((m: any) => {
-                        const uid  = String(m.user_id ?? "");
+                        const uid = String(m.user_id ?? "");
                         const role = ((m.user_role ?? m.role ?? "member") as string).toLowerCase();
                         return {
-                          id:         uid,
-                          user_id:    uid,
-                          name:       m.user_full_name ?? m.name ?? "Unknown",
-                          email:      m.user_email ?? m.email ?? "",
-                          role:       (role === "admin" || role === "a" ? "admin" : "member") as "admin" | "member",
+                          id: uid,
+                          user_id: uid,
+                          name: m.user_full_name ?? m.name ?? "Unknown",
+                          email: m.user_email ?? m.email ?? "",
+                          role: (role === "admin" || role === "a" ? "admin" : "member") as "admin" | "member",
                           avatarSeed: uid,
-                          joinDate:   m.joined_at ?? "",
+                          joinDate: m.joined_at ?? "",
                         };
                       })
                     : [];
@@ -176,7 +223,9 @@ export function Layout() {
       }
     };
  
-    fetchUserTeams();
+    if (currentUser.user_id) {
+      fetchUserTeams();
+    }
   }, [currentUser.user_id]);
  
   const handleTeamChange = (teamName: string) => {
@@ -184,13 +233,9 @@ export function Layout() {
     localStorage.setItem("tw_activeTeam", teamName);
   };
  
-  useEffect(() => {
-    const saved = localStorage.getItem("tw_theme");
-    if (saved === "dark") document.documentElement.classList.add("dark");
-  }, []);
- 
   return (
     <div className="flex h-screen bg-background">
+      {/* SIDEBAR LEFT */}
       <aside className="w-64 bg-card border-r border-border flex flex-col shadow-sm">
         <div className="h-20 flex items-center px-6 border-b border-border shrink-0">
           <div className="flex items-center gap-2">
@@ -208,7 +253,7 @@ export function Layout() {
                 to={path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
                   isActive
-                    ? "bg-blue-600 text-white shadow-md shadow-blue-200"
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-200 dark:shadow-none"
                     : "text-muted-foreground hover:bg-accent hover:text-foreground"
                 }`}
               >
@@ -233,44 +278,71 @@ export function Layout() {
         </div>
       </aside>
  
+      {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* HEADER TOP */}
         <header className="h-20 bg-card border-b border-border shadow-sm flex items-center justify-between px-6 shrink-0">
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input placeholder="Search tasks…" className="pl-10 bg-muted rounded-xl" />
-            </div>
-          </div>
- 
-          <div className="flex items-center gap-3">
+          
+          <div className="flex items-center gap-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild disabled={loading || teams.length === 0}>
-                <Button variant="outline" className="gap-2 rounded-xl border-border">
-                  <span className="text-sm">{loading ? "Loading..." : activeTeam}</span>
+                <Button variant="outline" className="gap-2 rounded-xl border-border bg-background hover:bg-accent">
+                  <span className="text-sm font-semibold text-foreground">{loading ? "Loading..." : activeTeam}</span>
                   <ChevronDown className="w-4 h-4 text-muted-foreground" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56 z-50 shadow-lg">
+              <DropdownMenuContent align="start" className="w-56 z-50 shadow-lg">
                 <DropdownMenuLabel>Switch Team</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 {teams.map((team, idx) => (
                   <DropdownMenuItem
-                    key={team.group_id || idx} 
+                    key={team.group_id || idx}
                     onClick={() => handleTeamChange(team.name)}
-                    className="cursor-pointer"
+                    className="cursor-pointer font-medium"
                   >
                     {team.name}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuContent>
             </DropdownMenu>
- 
-            <Button variant="ghost" size="icon" className="relative rounded-xl">
-              <Bell className="w-5 h-5 text-foreground/60" />
-            </Button>
           </div>
+ 
+          {/* BAGIAN WIDGET JAM, TANGGAL & UTILITY BUTTONS */}
+          <div className="flex items-center gap-4">
+            {/* 🌗 TOMBOL SWITCH SUN / MOON (DARK MODE TOGGLE) */}
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={toggleTheme} 
+              className="rounded-xl border-border bg-background hover:bg-accent text-foreground shadow-sm"
+              title={isDarkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {isDarkMode ? (
+                <Sun className="w-[18px] h-[18px] text-amber-500 animate-pulse" />
+              ) : (
+                <Moon className="w-[18px] h-[18px] text-blue-600" />
+              )}
+            </Button>
+
+            {/* 📅 WIDGET JAM DAN TANGGAL AUTOMATIC REDIRECT */}
+            <div 
+              onClick={() => navigate("/calendar")} // 👈 SEKARANG KALO DIKLIK OTOMATIS CO-REDIRECT KE CALENDAR
+              className="flex items-center gap-2.5 px-4 py-2 rounded-xl bg-muted/60 border border-border/60 shadow-sm cursor-pointer hover:bg-blue-50 dark:hover:bg-blue-950/40 hover:border-blue-300 dark:hover:border-blue-800 transition-all active:scale-95"
+              title="Go to Calendar"
+            >
+              <CalendarDays className="w-4 h-4 text-blue-500" />
+              <div className="flex flex-col text-left leading-tight">
+                <span className="text-xs font-bold text-foreground tracking-wide">{formattedDate}</span>
+                <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 font-mono mt-0.5">
+                  {formattedTime}
+                </span>
+              </div>
+            </div>
+          </div>
+          
         </header>
  
+        {/* VIEW ROUTER */}
         <main className="flex-1 overflow-auto bg-background">
           <Outlet context={{ activeTeam, setActiveTeam, teams, setTeams, currentUser }} />
         </main>

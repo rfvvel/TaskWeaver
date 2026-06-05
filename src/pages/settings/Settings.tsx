@@ -177,6 +177,8 @@ export function Settings() {
       if (res.ok && result.status === "sukses") {
         const updated = { ...user, UserFullName: fullName, UserEmail: email, UserPhoneNumber: phone };
         localStorage.setItem("user", JSON.stringify(updated));
+        // Notify Layout (and any listener) that user data changed
+        window.dispatchEvent(new Event("tw_user_updated"));
         setProfileMsg({ ok: true, text: "Profile updated successfully!" });
       } else {
         setProfileMsg({ ok: false, text: result.pesan || "Failed to update profile." });
@@ -292,12 +294,19 @@ export function Settings() {
   };
 
   const [isDark, setIsDark] = useState<boolean>(() =>
-    localStorage.getItem("tw_theme") === "dark" || document.documentElement.classList.contains("dark")
+    localStorage.getItem("theme") === "dark" || document.documentElement.classList.contains("dark")
   );
-  useEffect(() => {
-    if (isDark) { document.documentElement.classList.add("dark"); localStorage.setItem("tw_theme", "dark"); }
-    else        { document.documentElement.classList.remove("dark"); localStorage.setItem("tw_theme", "light"); }
-  }, [isDark]);
+
+  const applyTheme = (dark: boolean) => {
+    if (dark) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+    setIsDark(dark);
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("user");
@@ -477,14 +486,14 @@ export function Settings() {
                 <Label>Theme</Label>
                 <p className="text-sm text-muted-foreground">Choose your preferred color theme</p>
                 <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => setIsDark(false)} className={`p-4 rounded-xl border-2 transition-all text-left ${!isDark ? "border-indigo-500 bg-gradient-to-r from-indigo-50/50 to-cyan-50/50 dark:from-indigo-950/20 dark:to-cyan-950/20" : "border-border hover:border-indigo-200"}`}>
+                  <button onClick={() => applyTheme(false)} className={`p-4 rounded-xl border-2 transition-all text-left ${!isDark ? "border-indigo-500 bg-gradient-to-r from-indigo-50/50 to-cyan-50/50 dark:from-indigo-950/20 dark:to-cyan-950/20" : "border-border hover:border-indigo-200"}`}>
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-white border border-slate-200 shadow-sm" />
                       <div className="flex-1"><p className="font-medium text-sm text-foreground">Light</p><p className="text-xs text-muted-foreground">{!isDark ? "Active" : "Click to apply"}</p></div>
                       {!isDark && <Check className="w-4 h-4 text-indigo-600" />}
                     </div>
                   </button>
-                  <button onClick={() => setIsDark(true)} className={`p-4 rounded-xl border-2 transition-all text-left ${isDark ? "border-indigo-500 bg-slate-900" : "border-border hover:border-slate-400"}`}>
+                  <button onClick={() => applyTheme(true)} className={`p-4 rounded-xl border-2 transition-all text-left ${isDark ? "border-indigo-500 bg-slate-900" : "border-border hover:border-slate-400"}`}>
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-slate-800 border border-slate-700" />
                       <div className="flex-1"><p className="font-medium text-sm text-foreground">Dark</p><p className="text-xs text-muted-foreground">{isDark ? "Active" : "Click to apply"}</p></div>
