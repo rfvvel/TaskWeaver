@@ -17,17 +17,14 @@ export function Team() {
   const [teamNameError, setTeamNameError] = useState("");
   const [joinCodeError, setJoinCodeError] = useState("");
   
-  // State untuk efek loading saat nembak API
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
 
-  // Fungsi untuk mengambil data user yang sedang login dari localStorage
   const getLoggedInUser = () => {
     const userStr = localStorage.getItem("user");
     return userStr ? JSON.parse(userStr) : null;
   };
 
-  // Fungsi untuk men-generate Invite Code unik (e.g., TW-8X9P2)
   const generateRandomCode = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'; 
     let result = 'TW-';
@@ -156,7 +153,6 @@ export function Team() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-4xl">
         
-        {/* --- KOTAK CREATE TEAM --- */}
         <Card className="border-border shadow-sm hover:shadow-md transition-all hover:border-blue-200">
           <CardHeader>
             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 text-blue-600"><PlusCircle className="w-6 h-6" /></div>
@@ -187,7 +183,6 @@ export function Team() {
           </CardContent>
         </Card>
 
-        {/* --- KOTAK JOIN TEAM --- */}
         <Card className="border-border shadow-sm hover:shadow-md transition-all hover:border-indigo-200">
           <CardHeader>
             <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4 text-indigo-600"><Users className="w-6 h-6" /></div>

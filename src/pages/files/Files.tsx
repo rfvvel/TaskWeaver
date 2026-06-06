@@ -180,7 +180,6 @@ export function Files() {
                           <Download className="w-4 h-4 mr-2" />Download
                         </DropdownMenuItem>
                         
-                        {/* ✅ TOMBOL DELETE KHUSUS FILE INI */}
                         <DropdownMenuItem 
                           className="hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 cursor-pointer focus:text-red-600"
                           onClick={() => handleDeleteFile(file.id, file.name)}
@@ -253,7 +252,6 @@ export function Files() {
         </Card>
       </div>
 
-      {/* Search and Actions */}
       <div className="flex items-center gap-3">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -270,7 +268,6 @@ export function Files() {
         </Button>
       </div>
 
-      {/* Tabs */}
       <Tabs defaultValue="all" className="space-y-4">
         <TabsList className="bg-muted text-muted-foreground rounded-xl p-1">
           <TabsTrigger value="all" className="rounded-lg data-[state=active]:bg-card data-[state=active]:text-foreground">All Files</TabsTrigger>

@@ -59,14 +59,11 @@ export function Layout() {
   const [loading, setLoading] = useState<boolean>(true);
   
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    // Prioritaskan localStorage sebagai source of truth.
-    // Jika belum ada (null), baru fallback ke class DOM.
     const saved = localStorage.getItem("theme");
     if (saved !== null) return saved === "dark";
     return document.documentElement.classList.contains("dark");
   });
 
-  // Sinkronisasi DOM class dengan localStorage saat pertama mount
   useEffect(() => {
     const saved = localStorage.getItem("theme");
     if (saved === "dark") {
@@ -76,7 +73,6 @@ export function Layout() {
       document.documentElement.classList.remove("dark");
       setIsDarkMode(false);
     }
-    // Jika null (belum pernah set), biarkan DOM apa adanya dan simpan ke localStorage
     else {
       const isDom = document.documentElement.classList.contains("dark");
       localStorage.setItem("theme", isDom ? "dark" : "light");
@@ -84,7 +80,6 @@ export function Layout() {
     }
   }, []);
 
-  // Sinkronisasi mendengarkan event dari Settings.tsx
   useEffect(() => {
     const handleThemeUpdated = () => {
       const currentTheme = localStorage.getItem("theme") === "dark" || 
@@ -106,7 +101,6 @@ export function Layout() {
       localStorage.setItem("theme", "dark");
       setIsDarkMode(true);
     }
-    // Memicu event agar halaman Settings ikut ter-update jika tombol ini diklik
     window.dispatchEvent(new Event("tw_theme_updated"));
   };
   
@@ -310,9 +304,7 @@ export function Layout() {
         </div>
       </aside>
  
-      {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {/* HEADER TOP */}
         <header className="h-20 bg-card border-b border-border shadow-sm flex items-center justify-between px-6 shrink-0">
           
           <div className="flex items-center gap-2">
@@ -347,7 +339,6 @@ export function Layout() {
               className="rounded-xl border-border bg-background hover:bg-accent text-foreground shadow-sm"
               title={isDarkMode ? "Active: Dark Mode" : "Active: Light Mode"}
             >
-              {/* DI SINI SUDAH DITUKAR: Jika isDarkMode aktif tampilkan Moon, jika Light aktif tampilkan Sun */}
               {isDarkMode ? (
                 <Moon className="w-[18px] h-[18px] text-blue-400 animate-pulse" />
               ) : (
@@ -372,7 +363,6 @@ export function Layout() {
           
         </header>
  
-        {/* VIEW ROUTER */}
         <main className="flex-1 overflow-auto bg-background">
           <Outlet context={{ activeTeam, setActiveTeam, teams, setTeams, currentUser }} />
         </main>

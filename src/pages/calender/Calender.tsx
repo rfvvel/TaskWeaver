@@ -11,26 +11,21 @@ interface CalendarEvent {
   dueDate: string;
   assignedTo: string;
   status: string;
-  userId: string | number; // ✅ Tambahan wadah untuk ID User
+  userId: string | number; 
 }
 
 export function Calendar() {
   const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [baseDate, setBaseDate] = useState(new Date());
-
-  // ✅ 1. Ambil ID User yang sedang login (seperti di MyTasks)
   const storedUser = localStorage.getItem("user");
   const currentUser = storedUser ? JSON.parse(storedUser) : null;
   const currentUserId = currentUser?.UserID || currentUser?.user_id || currentUser?.id || null;
-
   const currentTeam = teams?.find((t: any) => t.name === activeTeam);
   const groupId = currentTeam?.group_id || currentTeam?.id;
 
-  // 2. Fetch data Sub-task lalu saring berdasarkan User Login
   useEffect(() => {
     const fetchEvents = async () => {
-      // Jika tidak ada tim yang dipilih atau user belum login, kosongkan kalender
       if (!groupId || !currentUserId) {
          setEvents([]);
          return;
@@ -53,7 +48,6 @@ export function Calendar() {
               status: item.detail_task_status || item.DetailTaskStatus || "todo",
               userId: item.user_id || item.UserId // Ambil ID pemilik tugas
             }))
-            // ✅ FILTER SAKTI: Hanya sisakan tugas yang ID-nya cocok dengan currentUserId
             .filter((item: CalendarEvent) => String(item.userId) === String(currentUserId));
             
           setEvents(mapped);
@@ -79,14 +73,11 @@ export function Calendar() {
 
   const goToToday = () => setBaseDate(new Date());
 
-  // 3. Logika untuk membuat Grid Kalender Bulan
   const getMonthDays = (date: Date) => {
     const year = date.getFullYear();
     const month = date.getMonth();
-    
     const firstDay = new Date(year, month, 1).getDay(); 
     const daysInMonth = new Date(year, month + 1, 0).getDate(); 
-    
     const days = [];
     const todayStr = new Date().toDateString();
 
@@ -97,8 +88,6 @@ export function Calendar() {
     for (let i = 1; i <= daysInMonth; i++) {
       const currentDate = new Date(year, month, i);
       const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-      
-      // ✅ Logika kebal timezone
       const dayTasks = events.filter(t => {
         if (!t.dueDate) return false;
         const d = new Date(t.dueDate);
@@ -123,8 +112,6 @@ export function Calendar() {
   const currentMonthDays = getMonthDays(baseDate);
   const currentMonthLabel = baseDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-  // 4. Logika Upcoming Deadlines (Max 7 Hari ke depan dari Hari Ini)
   const today = new Date();
   today.setHours(0, 0, 0, 0); 
   const nextWeek = new Date(today);
@@ -219,7 +206,6 @@ export function Calendar() {
           </CardContent>
         </Card>
 
-        {/* Kolom Kanan: Upcoming Deadlines */}
         <Card className="border-border shadow-sm bg-card">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">

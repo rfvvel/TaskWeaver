@@ -26,7 +26,7 @@ type RegisterFormInputs = z.infer<typeof registerSchema>;
 function AnimatedBackground() {
   return (
     <>
-      {/* Gradient Background */}
+
       <div
         className="absolute inset-0"
         style={{
@@ -35,7 +35,7 @@ function AnimatedBackground() {
         }}
       />
 
-      {/* Glow Effects */}
+
       <div className="absolute top-[-100px] left-[10%] w-[500px] h-[500px] rounded-full bg-cyan-400/20 blur-3xl" />
 
       <div className="absolute bottom-[-150px] right-[10%] w-[400px] h-[400px] rounded-full bg-blue-500/20 blur-3xl" />
@@ -136,13 +136,9 @@ export default function RegisterPage() {
   return (
     <div className="relative min-h-screen overflow-hidden flex flex-col justify-center items-center p-4">
 
-      {/* Animated Background */}
       <AnimatedBackground />
-
-      {/* Main Content */}
       <div className="relative z-10 w-full flex flex-col items-center">
 
-        {/* Logo */}
         <div className="flex items-center justify-center gap-3 mb-5">
           <img
             src={LogoTW2}
@@ -155,7 +151,6 @@ export default function RegisterPage() {
           </span>
         </div>
 
-        {/* Register Card */}
         <div className="w-full max-w-md bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-white/20 p-8">
 
           <h2 className="text-2xl font-bold text-slate-900 mb-2">
@@ -166,7 +161,6 @@ export default function RegisterPage() {
             Start managing your team's tasks with AI.
           </p>
 
-          {/* Backend Error */}
           {serverError && (
             <div className="p-3 mb-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-200">
               {serverError}
@@ -175,7 +169,6 @@ export default function RegisterPage() {
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
 
-            {/* Full Name */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Full Name
@@ -199,7 +192,6 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Email Address
@@ -223,7 +215,6 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Phone Number
@@ -247,7 +238,6 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Password
@@ -271,7 +261,6 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Confirm Password */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Confirm Password
@@ -295,7 +284,6 @@ export default function RegisterPage() {
               )}
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -336,7 +324,6 @@ export default function RegisterPage() {
             </button>
           </form>
 
-          {/* Footer */}
           <p className="mt-6 text-center text-sm text-slate-600">
             Already have an account?{" "}
             <Link

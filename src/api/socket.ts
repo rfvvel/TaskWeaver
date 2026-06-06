@@ -1,6 +1,3 @@
-// src/api/socket.ts
-// Koneksi Socket.IO singleton ke backend. Base URL mengikuti chatApi.ts.
-
 import { io, type Socket } from "socket.io-client";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3000";

@@ -195,7 +195,6 @@ export function Dashboard() {
     );
   }
 
-  // DEFINISI DATA METRIK UNTUK MENANGANI REDIRECT & WARNA KARTU SECARA DINAMIS (ALL BLUE ACCENT)
   const metricCards = [
     { 
       label: "Team Members", 

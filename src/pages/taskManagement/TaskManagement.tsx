@@ -24,7 +24,6 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const API = "http://localhost:3000/api";
 
-// ─── Types ───────────────────────────────────────────────────
 interface SubTask {
   detail_task_id: number;
   task_id: number;
@@ -34,7 +33,6 @@ interface SubTask {
   detail_task_status: string;
   assigned_user_name?: string;
 }
-
 interface Task {
   TaskId: number;
   Group_Id: number;
@@ -46,14 +44,11 @@ interface Task {
   task_status: string;
   subtasks?: SubTask[];
 }
-
 interface Member {
   user_id: number;
   user_full_name: string;
   user_role: string;
 }
-
-// ─── Helpers ─────────────────────────────────────────────────
 
 function safeFormat(dateStr: any, fmt: string) {
   if (!dateStr) return "No date";
@@ -84,10 +79,8 @@ function getStatusColor(status: string) {
   return map[status] ?? map["todo"];
 }
 
-// ─── Custom Calendar ──────────────────────────────────────────
 function MiniCalendar({ selected, onSelect }: { selected?: Date; onSelect: (date: Date) => void }) {
   const [viewDate, setViewDate] = useState(selected ?? new Date());
-
   const start = startOfWeek(startOfMonth(viewDate), { weekStartsOn: 0 });
   const end = endOfWeek(endOfMonth(viewDate), { weekStartsOn: 0 });
 
@@ -155,7 +148,6 @@ function MiniCalendar({ selected, onSelect }: { selected?: Date; onSelect: (date
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────
 export function TaskManagement() {
   const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
   
@@ -179,7 +171,6 @@ export function TaskManagement() {
   const [isRebalancing, setIsRebalancing] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   
-  // Validation States
   const [taskNameError, setTaskNameError] = useState("");
   const [taskDescError, setTaskDescError] = useState("");
   
@@ -192,7 +183,6 @@ export function TaskManagement() {
   };
   const [formData, setFormData] = useState(emptyForm);
 
-  // ── Fetch tasks by group ──
   const fetchTasks = useCallback(async () => {
     if (!activeGroupId) return;
     setLoading(true);
@@ -223,7 +213,6 @@ export function TaskManagement() {
     }
   }, [activeGroupId]);
 
-  // ── Fetch members ──
   const fetchMembers = useCallback(async () => {
     if (!activeGroupId) return;
     try {
@@ -244,7 +233,6 @@ export function TaskManagement() {
     fetchMembers();
   }, [fetchTasks, fetchMembers]);
 
-  // ── Fetch subtasks when task selected ──
   const fetchSubtasks = async (task_id: number) => {
     setLoadingSubtasks(true);
     try {
@@ -282,7 +270,6 @@ export function TaskManagement() {
     fetchSubtasks(task.TaskId);
   };
 
-  // ── Create Task ──
   const handleCreateTask = async () => {
     let hasError = false;
     if (!formData.TaskName.trim()) { setTaskNameError("Task Title wajib diisi!"); hasError = true; }
@@ -317,7 +304,6 @@ export function TaskManagement() {
     }
   };
 
-  // ── Update Task ──
   const handleUpdateTask = async () => {
     if (!editingTask) return;
     
@@ -354,7 +340,6 @@ export function TaskManagement() {
     }
   };
 
-  // ── Delete Task (DENGAN LOG ACTIVITY) ──
   const handleDeleteTask = async (task_id: number, task_title: string) => {
     try {
       const res = await fetch(`${API}/taskDelete`, {
@@ -389,7 +374,6 @@ export function TaskManagement() {
     }
   };
 
-  // ── AI Breakdown ──
   const handleRunAI = async () => {
     if (!selectedTask) return;
     setIsGeneratingAI(true);
@@ -420,7 +404,6 @@ export function TaskManagement() {
     }
   };
 
-  // ── AI Rebalance ──
   const handleRebalance = async () => {
     if (!selectedTask) return;
     setIsRebalancing(true);

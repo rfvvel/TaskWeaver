@@ -21,8 +21,6 @@ const formatDate = (dateStr: string) => {
   return isNaN(d.getTime()) ? "Invalid Date" : d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 };
 
-// ─── FIX: Robust user ID resolution from localStorage ───────────────────────
-// Handles all possible key casings that may come from different login flows
 const resolveUserId = (user: Record<string, any>): string | null => {
   const id =
     user?.UserID ??
@@ -70,7 +68,6 @@ export function TeamManagement() {
     const user = getLoggedInUser();
     if (!user) return;
 
-    // FIX: use robust resolveUserId instead of one-liner chain
     const userId = resolveUserId(user);
     if (!userId) {
       console.error("[TeamManagement] fetchUserTeams: cannot resolve userId from", user);
@@ -206,7 +203,6 @@ export function TeamManagement() {
       return;
     }
 
-    // FIX: use robust resolveUserId
     const userId = resolveUserId(user);
     if (!userId) {
       alert("Gagal mendapatkan User ID. Coba logout dan login kembali.");
@@ -267,7 +263,6 @@ export function TeamManagement() {
     const user = getLoggedInUser();
     if (!user) return;
 
-    // FIX: use robust resolveUserId
     const userId = resolveUserId(user);
     if (!userId) {
       setJoinCodeError("Gagal mendapatkan User ID. Coba logout dan login kembali.");
@@ -366,7 +361,6 @@ export function TeamManagement() {
       console.log("[TeamManagement] handleCreateTeam response:", result);
 
       if (response.ok && result.status === "sukses") {
-        // Close dialog and reset form
         setCreateDialogOpen(false);
         setNewTeamName("");
         setNewTeamDesc("");
@@ -374,11 +368,9 @@ export function TeamManagement() {
         setActiveTeam(newTeamName);
         localStorage.setItem("tw_activeTeam", newTeamName);
 
-        // Refresh teams list from database
         await fetchUserTeams();
         alert("Tim baru berhasil dibuat dan disimpan ke database!");
       } else {
-        // FIX: show the actual server error message to help debugging
         const errorMsg = result.pesan || result.message || "Gagal membuat tim. Cek console untuk detail.";
         alert(`Gagal membuat tim: ${errorMsg}`);
         console.error("[TeamManagement] Create team failed:", result);

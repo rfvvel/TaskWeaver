@@ -24,7 +24,6 @@ import { channelApi, chatApi } from "../../api/chatApi";
 import type { ApiChannel, ApiChat } from "../../api/chatApi";
 import { getSocket } from "../../api/socket";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface TeamMember {
   id?: string;
@@ -62,11 +61,10 @@ interface Message {
   user: string;
   message: string;
   time: string;
-  date: string;   // "YYYY-MM-DD" untuk grouping per hari
+  date: string; 
   isOwn: boolean;
 }
 
-// ─── Converters ───────────────────────────────────────────────────────────────
 
 const toChannel = (a: ApiChannel): Channel => ({
   id: a.channel_id,
@@ -83,13 +81,10 @@ const toMessage = (a: ApiChat, currentUserId: string): Message => {
     user: a.user_full_name ?? "Unknown",
     message: a.chat_message,
     time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-    // SESUDAH (ikut timezone lokal user)
     date: `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`, // "YYYY-MM-DD"
     isOwn: a.user_id === currentUserId,
   };
 };
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export function Chat() {
   const navigate = useNavigate();
@@ -105,8 +100,6 @@ export function Chat() {
 
   const groupId = activeTeamData?.group_id || activeTeamData?.id || "";
   const userId  = currentUser?.id ?? "";
-
-  // ── State ──────────────────────────────────────────────────────────────────
 
   const [channels,        setChannels]        = useState<Channel[]>([]);
   const [messages,        setMessages]        = useState<Message[]>([]);
@@ -131,11 +124,10 @@ export function Chat() {
   const inputRef             = useRef<HTMLInputElement>(null);
   const inputFocused         = useRef(false);
   const initialLoadDone      = useRef(false);
-  const shouldScrollToBottom = useRef(false); // sinyal paksa scroll — HANYA set dari channel reset & send
+  const shouldScrollToBottom = useRef(false); 
 
   const selectedChannel = channels.find((c) => c.id === activeChannelId);
 
-  // ── Fetch channels ─────────────────────────────────────────────────────────
 
   const fetchChannels = useCallback(async () => {
     if (!groupId) return;
@@ -162,10 +154,6 @@ export function Chat() {
     fetchChannels();
   }, [fetchChannels]);
 
-  // ── Fetch messages ─────────────────────────────────────────────────────────
-  // Polling setiap 1 detik, tapi tetap mempertahankan pesan optimistic
-  // yang belum dikonfirmasi server agar tidak hilang saat interval berjalan.
-
   const fetchMessages = useCallback(async () => {
     if (!groupId || !activeChannelId) return;
 
@@ -179,7 +167,6 @@ export function Chat() {
       const res = await chatApi.getByChannel(groupId, activeChannelId);
       const incoming = (res.data ?? []).map((m) => toMessage(m, userId));
 
-      // Set sinyal SEBELUM setMessages agar useLayoutEffect tangkap setelah data ada
       if (isInitial) {
         shouldScrollToBottom.current = true;
       }
@@ -199,10 +186,9 @@ export function Chat() {
     }
   }, [groupId, activeChannelId, userId]);
 
-  // Reset + fetch awal saat channel berganti, lalu polling setiap 1 detik
   useEffect(() => {
     setMessages([]);
-    initialLoadDone.current = false; // ini yang trigger isInitial=true di fetchMessages
+    initialLoadDone.current = false; 
     fetchMessages();
 
     const interval = setInterval(() => {
@@ -211,8 +197,6 @@ export function Chat() {
 
     return () => clearInterval(interval);
   }, [fetchMessages]);
-
-  // ── Real-time: Socket (tetap dipertahankan sebagai backup cepat) ──────────
 
   useEffect(() => {
     if (!groupId || !activeChannelId) return;
@@ -251,31 +235,22 @@ export function Chat() {
     };
   }, [groupId, activeChannelId, userId]);
 
-  // ── Auto scroll + restore focus ────────────────────────────────────────────
-  // useLayoutEffect jalan setelah DOM update tapi sebelum browser paint,
-  // sehingga scrollHeight sudah akurat saat kita baca.
-
   useLayoutEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
     if (shouldScrollToBottom.current) {
-      // Paksa scroll ke bawah: initial load channel atau kirim pesan sendiri
       el.scrollTop = el.scrollHeight;
-      shouldScrollToBottom.current = false; // reset sinyal
+      shouldScrollToBottom.current = false;
     } else {
-      // Polling biasa: hanya scroll kalau user sudah dekat bawah (threshold 80px)
       const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
       if (isNearBottom) el.scrollTop = el.scrollHeight;
     }
 
-    // Restore focus input jika sebelumnya sedang focused
     if (inputFocused.current && inputRef.current && document.activeElement !== inputRef.current) {
       inputRef.current.focus();
     }
   }, [messages]);
-
-  // ── Helpers ────────────────────────────────────────────────────────────────
 
   const initials = (name: string) =>
     (name || "U").trim().split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase();
@@ -283,7 +258,6 @@ export function Chat() {
   const slugify = (s: string) =>
     s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
 
-  // Label tanggal yang ramah: "Today", "Yesterday", atau "Monday, Jun 2"
   const formatDateLabel = (dateStr: string): string => {
     const now = new Date();
     const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -299,8 +273,6 @@ export function Chat() {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   };
-
-  // ── Send message (Optimistic UI) ───────────────────────────────────────────
 
   const handleSend = async () => {
     if (!message.trim() || !selectedChannel || !groupId || !userId) return;
@@ -321,25 +293,20 @@ export function Chat() {
 
     setMessages((prev) => [...prev, optimistic]);
     setMessage("");
-    shouldScrollToBottom.current = true; // useLayoutEffect akan scroll ke bawah setelah render
+    shouldScrollToBottom.current = true; 
 
     try {
       await chatApi.send(groupId, userId, activeChannelId, currentMsgText);
-      // Polling / socket akan mengganti data optimistic dengan data riil
     } catch (err: unknown) {
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       setApiError(err instanceof Error ? err.message : "Gagal mengirim pesan");
     } finally {
       setSendingMsg(false);
-      // requestAnimationFrame memastikan focus dipanggil setelah React selesai re-render,
-      // sehingga tidak dibuang oleh polling yang berjalan setiap 1 detik.
       requestAnimationFrame(() => {
         inputRef.current?.focus();
       });
     }
   };
-
-  // ── Edit message ───────────────────────────────────────────────────────────
 
   const startEdit = (msg: Message) => {
     setEditingMsgId(msg.id);
@@ -363,8 +330,6 @@ export function Chat() {
     }
   };
 
-  // ── Delete message ─────────────────────────────────────────────────────────
-
   const handleDeleteMessage = async (msg: Message) => {
     try {
       await chatApi.delete(msg.id, userId);
@@ -373,8 +338,6 @@ export function Chat() {
       setApiError(err instanceof Error ? err.message : "Gagal menghapus pesan");
     }
   };
-
-  // ── Create channel ─────────────────────────────────────────────────────────
 
   const handleCreateChannel = async () => {
     const trimmedInput = channelName.trim();
@@ -399,8 +362,6 @@ export function Chat() {
       setCreatingCh(false);
     }
   };
-
-  // ── Delete channel ─────────────────────────────────────────────────────────
 
   const handleDeleteChannel = async (ch: Channel) => {
     try {
@@ -511,7 +472,6 @@ export function Chat() {
         <CardContent className="p-0 h-full">
           <div className="flex h-full">
 
-            {/* ── Left: Channels Sidebar ── */}
             <div className="w-60 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 bg-white dark:bg-slate-900">
               <div className="p-4 border-b border-slate-200 dark:border-slate-800">
                 <h2 className="text-sm font-bold truncate">{activeTeam}</h2>
@@ -598,7 +558,6 @@ export function Chat() {
               </ScrollArea>
             </div>
 
-            {/* ── Center: Chat Area ── */}
             <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 dark:bg-slate-950/20 border-r border-slate-200 dark:border-slate-800">
               {selectedChannel ? (
                 <>
@@ -626,7 +585,6 @@ export function Chat() {
                           const showDateSeparator = !prevMsg || prevMsg.date !== msg.date;
                           return (
                             <div key={msg.id}>
-                              {/* ── Date separator ── */}
                               {showDateSeparator && (
                                 <div className="flex items-center gap-3 my-4">
                                   <div className="flex-1 h-px bg-slate-200 dark:bg-slate-700" />
@@ -637,7 +595,6 @@ export function Chat() {
                                 </div>
                               )}
 
-                              {/* ── Message bubble ── */}
                               <div className={`flex gap-3 group ${msg.isOwn ? "flex-row-reverse" : ""}`}>
                                 <Avatar className="w-9 h-9 flex-shrink-0">
                                   <AvatarFallback className="text-xs font-semibold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300">
@@ -773,7 +730,6 @@ export function Chat() {
               )}
             </div>
 
-            {/* ── Right Sidebar: Members ── */}
             <div className="w-60 flex flex-col shrink-0 bg-white dark:bg-slate-900">
               <div className="p-4 border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-2">

@@ -333,7 +333,6 @@ export function Settings() {
           <TabsTrigger value="security"   className="rounded-lg gap-2"><Lock    className="w-4 h-4" />Security</TabsTrigger>
         </TabsList>
 
-        {/* ── PROFILE ── */}
         <TabsContent value="profile" className="space-y-6">
           <Card className="border-border shadow-sm">
             <CardHeader>
@@ -391,7 +390,6 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        {/* ── SKILLS ── */}
         <TabsContent value="skills" className="space-y-6">
           <Card className="border-border shadow-sm">
             <CardHeader>
@@ -472,7 +470,6 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        {/* ── APPEARANCE ── */}
         <TabsContent value="appearance" className="space-y-6">
           <Card className="border-border shadow-sm">
             <CardHeader>
@@ -504,7 +501,6 @@ export function Settings() {
           </Card>
         </TabsContent>
 
-        {/* ── SECURITY ── */}
         <TabsContent value="security" className="space-y-6">
           <Card className="border-border shadow-sm">
             <CardHeader>

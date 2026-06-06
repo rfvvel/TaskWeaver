@@ -9,7 +9,6 @@ import { Button } from "../../components/ui/button";
 
 const API = "http://localhost:3000/api";
 
-// ─── Component Bantuan untuk Icon Activity ────────────────────────────
 function ActivityDot({ type }: { type: string }) {
   const isStarted = type?.toLowerCase().includes("in-progress") || type?.toLowerCase().includes("start");
   const isCompleted = type?.toLowerCase().includes("completed") || type?.toLowerCase().includes("c");
@@ -25,7 +24,6 @@ function ActivityDot({ type }: { type: string }) {
   );
 }
 
-// ─── Main Component ───────────────────────────────────────────────────
 export function TeamActivity() {
   const { activeTeam, teams } = useOutletContext<{ activeTeam: string; teams: any[] }>();
   const navigate = useNavigate();
@@ -38,13 +36,11 @@ export function TeamActivity() {
   const [teamTasks, setTeamTasks] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
 
-  // ─── Fetch Semua Data ───────────────────────────────────────────────
   const fetchActivityData = useCallback(async () => {
     if (!groupId) return;
     setLoading(true);
 
     try {
-      // 1. Fetch Members
       const resMembers = await fetch(`${API}/groupGetMember`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -53,7 +49,6 @@ export function TeamActivity() {
       const dataMembers = await resMembers.json();
       if (dataMembers.status === "sukses") setMembers(dataMembers.data || []);
 
-      // 2. Fetch Detail Tasks (Semua tugas di tim ini)
       const resTeamTasks = await fetch(`${API}/detailTaskGetByGroup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -62,7 +57,6 @@ export function TeamActivity() {
       const dataTeamTasks = await resTeamTasks.json();
       if (dataTeamTasks.status === "sukses") setTeamTasks(dataTeamTasks.data || []);
 
-      // 3. Fetch Activity Log
       const resActivity = await fetch(`${API}/getActivityByGroup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -82,7 +76,6 @@ export function TeamActivity() {
     fetchActivityData();
   }, [fetchActivityData]);
 
-  // ─── Kalkulasi Overall Team Progress ────────────────────────────────
   const totalTasks = teamTasks.length;
   const completedTasks = teamTasks.filter(t => 
     (t.detail_task_status || t.DetailTaskStatus) === "completed" || 
@@ -91,7 +84,6 @@ export function TeamActivity() {
   const remainingTasks = totalTasks - completedTasks;
   const overallProgress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-  // ─── Kalkulasi Member Progress ──────────────────────────────────────
   const memberStats = members.map(m => {
     const memId = String(m.user_id || m.UserId);
     // Cari tugas yang di-assign ke member ini
@@ -111,8 +103,6 @@ export function TeamActivity() {
       progress: mProgress
     };
   });
-
-  // Urutkan memberStats berdasarkan yang progressnya tertinggi (Opsional)
   memberStats.sort((a, b) => b.progress - a.progress);
 
   // Jika tidak ada tim aktif
@@ -143,7 +133,6 @@ export function TeamActivity() {
         <p className="text-muted-foreground">Real-time updates and progress for <span className="font-semibold text-indigo-600 dark:text-indigo-400">{activeTeam}</span></p>
       </div>
 
-      {/* Overall Team Progress */}
       <Card className="border-border shadow-sm">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -168,7 +157,6 @@ export function TeamActivity() {
       </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Activity Timeline (Sama seperti Dashboard tapi tampilan Timeline) */}
         <Card className="lg:col-span-2 border-border shadow-sm">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
@@ -178,7 +166,6 @@ export function TeamActivity() {
             <div className="space-y-4">
               {activities.length > 0 ? activities.map((activity, idx) => (
                 <div key={activity.log_id || idx} className="flex gap-4">
-                  {/* Timeline line */}
                   <div className="flex flex-col items-center">
                     <ActivityDot type={activity.action_type === 'I' || activity.action_description?.toLowerCase().includes('start') ? 'started' : 'completed'} />
                     {idx < activities.length - 1 && (
@@ -186,7 +173,6 @@ export function TeamActivity() {
                     )}
                   </div>
 
-                  {/* Activity content */}
                   <div className="flex-1 pb-6">
                     <div className="p-4 rounded-xl border border-border bg-slate-50 dark:bg-slate-950/50 hover:bg-accent transition-colors">
                       <div className="flex items-start gap-3">
@@ -223,7 +209,6 @@ export function TeamActivity() {
           </CardContent>
         </Card>
 
-        {/* Team Member Individual Progress */}
         <Card className="border-border shadow-sm h-fit">
           <CardHeader>
             <CardTitle>Member Progress</CardTitle>

@@ -31,7 +31,6 @@ function safeFormat(dateStr: any, fmt: string) {
 }
 
 export function MyTasks() {
-  // activeTeam dihapus dari sini karena kita akan menampilkan semua task lintas tim
   const { teams } = useOutletContext<{ teams: any[] }>();
 
   const storedUser = localStorage.getItem("user");
@@ -335,7 +334,6 @@ export function MyTasks() {
         </Tabs>
       )}
 
-      {/* MODAL SUBMIT WORK */}
       <Dialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
         <DialogContent className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 sm:max-w-md text-slate-900 dark:text-slate-50">
           <DialogHeader>
@@ -429,7 +427,6 @@ export function MyTasks() {
         </DialogContent>
       </Dialog>
 
-      {/* MODAL VIEW SUBMITTED WORK */}
       <Dialog open={viewDialogOpen} onOpenChange={setViewDialogOpen}>
         <DialogContent className="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 sm:max-w-md text-slate-900 dark:text-slate-50">
           <DialogHeader>

@@ -27,12 +27,10 @@ function AnimatedBackground() {
         }}
       />
 
-      {/* Glow Effects */}
       <div className="absolute top-[-100px] left-[10%] w-[500px] h-[500px] rounded-full bg-cyan-400/20 blur-3xl" />
 
       <div className="absolute bottom-[-150px] right-[10%] w-[400px] h-[400px] rounded-full bg-blue-500/20 blur-3xl" />
 
-      {/* Animated Particles */}
       <Particles
         id="loginParticles"
         className="absolute inset-0"
@@ -212,7 +210,6 @@ export default function LoginPage() {
               )}
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
                 Password
@@ -236,7 +233,6 @@ export default function LoginPage() {
               )}
             </div>
 
-            {/* Button */}
             <button
               type="submit"
               disabled={isLoading}
@@ -277,7 +273,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Footer */}
           <p className="mt-6 text-center text-sm text-slate-600">
             Don't have an account?{" "}
             <Link
