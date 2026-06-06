@@ -124,6 +124,8 @@ export function Chat() {
   const [savingEdit,     setSavingEdit]     = useState(false);
 
   const scrollRef        = useRef<HTMLDivElement>(null);
+  const inputRef         = useRef<HTMLInputElement>(null);
+  const inputFocused     = useRef(false); // track apakah input sedang focused
   // Dipakai untuk membedakan load pertama vs polling — hanya load pertama
   // yang boleh menampilkan spinner "Loading messages…"
   const initialLoadDone  = useRef(false);
@@ -242,11 +244,15 @@ export function Chat() {
     };
   }, [groupId, activeChannelId, userId]);
 
-  // ── Auto scroll ────────────────────────────────────────────────────────────
+  // ── Auto scroll + restore focus setelah polling re-render ─────────────────
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+    // Kalau input sedang focused sebelum polling re-render, kembalikan focus-nya
+    if (inputFocused.current && inputRef.current && document.activeElement !== inputRef.current) {
+      inputRef.current.focus();
     }
   }, [messages]);
 
@@ -287,6 +293,11 @@ export function Chat() {
       setApiError(err instanceof Error ? err.message : "Gagal mengirim pesan");
     } finally {
       setSendingMsg(false);
+      // requestAnimationFrame memastikan focus dipanggil setelah React selesai re-render,
+      // sehingga tidak dibuang oleh polling yang berjalan setiap 1 detik.
+      requestAnimationFrame(() => {
+        inputRef.current?.focus();
+      });
     }
   };
 
@@ -669,9 +680,12 @@ export function Chat() {
                   <div className="p-4 border-t border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
                     <div className="flex items-center gap-2">
                       <Input
+                        ref={inputRef}
                         placeholder={`Message #${selectedChannel.name}`}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
+                        onFocus={() => { inputFocused.current = true; }}
+                        onBlur={() => { inputFocused.current = false; }}
                         onKeyDown={(e) => e.key === "Enter" && !sendingMsg && handleSend()}
                         disabled={sendingMsg}
                         className="rounded-xl bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-white"
