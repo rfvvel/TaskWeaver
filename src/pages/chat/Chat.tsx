@@ -23,12 +23,12 @@ import {
 import { channelApi, chatApi } from "../../api/chatApi";
 import type { ApiChannel, ApiChat } from "../../api/chatApi";
 import { getSocket } from "../../api/socket";
- 
+
 // ─── Types ────────────────────────────────────────────────────────────────────
- 
+
 interface TeamMember {
-  id?: string;       
-  user_id?: string;   
+  id?: string;
+  user_id?: string;
   UserId?: string;
   name?: string;
   user_full_name?: string;
@@ -38,9 +38,9 @@ interface TeamMember {
   role_name?: string;
   RoleName?: string;
 }
- 
+
 interface Team {
-  id?: string;   
+  id?: string;
   group_id?: string;
   name: string;
   description?: string;
@@ -48,32 +48,32 @@ interface Team {
   members: TeamMember[];
   bigTasks?: unknown[];
 }
- 
+
 interface Channel {
-  id: string;       
+  id: string;
   name: string;
   isPrivate: boolean;
   isDefault: boolean;
 }
- 
+
 interface Message {
-  id: string;       
-  userId: string;   
-  user: string;     
+  id: string;
+  userId: string;
+  user: string;
   message: string;
   time: string;
   isOwn: boolean;
 }
- 
+
 // ─── Converters ───────────────────────────────────────────────────────────────
- 
+
 const toChannel = (a: ApiChannel): Channel => ({
   id: a.channel_id,
   name: a.channel_name,
   isPrivate: false,
   isDefault: false,
 });
- 
+
 const toMessage = (a: ApiChat, currentUserId: string): Message => ({
   id: a.chat_id,
   userId: a.user_id,
@@ -84,51 +84,54 @@ const toMessage = (a: ApiChat, currentUserId: string): Message => ({
     : "",
   isOwn: a.user_id === currentUserId,
 });
- 
+
 // ─── Component ────────────────────────────────────────────────────────────────
- 
+
 export function Chat() {
   const navigate = useNavigate();
- 
+
   const { activeTeam, teams, currentUser } = useOutletContext<{
     activeTeam: string;
     teams: Team[];
     currentUser: { id: string; name: string };
   }>();
- 
+
   const activeTeamData = teams.find((t) => t.name === activeTeam);
   const members: TeamMember[] = activeTeamData?.members ?? [];
-  
-  const groupId = activeTeamData?.group_id || activeTeamData?.id || "";   
-  const userId  = currentUser?.id ?? "";      
- 
+
+  const groupId = activeTeamData?.group_id || activeTeamData?.id || "";
+  const userId  = currentUser?.id ?? "";
+
   // ── State ──────────────────────────────────────────────────────────────────
- 
-  const [channels,         setChannels]         = useState<Channel[]>([]);
-  const [messages,         setMessages]         = useState<Message[]>([]);
-  const [activeChannelId,  setActiveChannelId]  = useState<string>("");
-  const [message,          setMessage]          = useState("");
- 
+
+  const [channels,        setChannels]        = useState<Channel[]>([]);
+  const [messages,        setMessages]        = useState<Message[]>([]);
+  const [activeChannelId, setActiveChannelId] = useState<string>("");
+  const [message,         setMessage]         = useState("");
+
   const [loadingChannels, setLoadingChannels] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sendingMsg,      setSendingMsg]      = useState(false);
   const [apiError,        setApiError]        = useState<string | null>(null);
- 
+
   const [createOpen,  setCreateOpen]  = useState(false);
   const [channelName, setChannelName] = useState("");
   const [nameError,   setNameError]   = useState("");
   const [creatingCh,  setCreatingCh]  = useState(false);
- 
+
   const [editingMsgId,   setEditingMsgId]   = useState<string | null>(null);
   const [editingMsgText, setEditingMsgText] = useState("");
   const [savingEdit,     setSavingEdit]     = useState(false);
- 
-  const scrollRef = useRef<HTMLDivElement>(null);
- 
+
+  const scrollRef        = useRef<HTMLDivElement>(null);
+  // Dipakai untuk membedakan load pertama vs polling — hanya load pertama
+  // yang boleh menampilkan spinner "Loading messages…"
+  const initialLoadDone  = useRef(false);
+
   const selectedChannel = channels.find((c) => c.id === activeChannelId);
- 
+
   // ── Fetch channels ─────────────────────────────────────────────────────────
- 
+
   const fetchChannels = useCallback(async () => {
     if (!groupId) return;
     setLoadingChannels(true);
@@ -146,99 +149,124 @@ export function Chat() {
       setLoadingChannels(false);
     }
   }, [groupId]);
- 
+
   useEffect(() => {
     setChannels([]);
     setMessages([]);
     setActiveChannelId("");
     fetchChannels();
   }, [fetchChannels]);
- 
+
   // ── Fetch messages ─────────────────────────────────────────────────────────
- 
+  // Polling setiap 1 detik, tapi tetap mempertahankan pesan optimistic
+  // yang belum dikonfirmasi server agar tidak hilang saat interval berjalan.
+
   const fetchMessages = useCallback(async () => {
     if (!groupId || !activeChannelId) return;
-    setLoadingMessages(true);
+
+    // Hanya tampilkan spinner saat pertama kali load channel ini
+    if (!initialLoadDone.current) {
+      setLoadingMessages(true);
+    }
+
     try {
       const res = await chatApi.getByChannel(groupId, activeChannelId);
-      setMessages((res.data ?? []).map((m) => toMessage(m, userId)));
+      const incoming = (res.data ?? []).map((m) => toMessage(m, userId));
+
+      setMessages((prev) => {
+        // Pertahankan pesan optimistic (id mulai "opt-") yang belum ada di server
+        const optimistics = prev.filter((m) => m.id.startsWith("opt-"));
+        const incomingIds = new Set(incoming.map((m) => m.id));
+        const pendingOpts = optimistics.filter((o) => !incomingIds.has(o.id));
+        return [...incoming, ...pendingOpts];
+      });
+
+      // Tandai bahwa load pertama sudah selesai
+      initialLoadDone.current = true;
     } catch (err: unknown) {
       setApiError(err instanceof Error ? err.message : "Gagal memuat pesan");
     } finally {
       setLoadingMessages(false);
     }
   }, [groupId, activeChannelId, userId]);
- 
+
+  // Reset + fetch awal saat channel berganti, lalu polling setiap 1 detik
   useEffect(() => {
     setMessages([]);
+    initialLoadDone.current = false; // reset flag agar spinner muncul di channel baru
     fetchMessages();
+
+    const interval = setInterval(() => {
+      fetchMessages();
+    }, 1000);
+
+    return () => clearInterval(interval);
   }, [fetchMessages]);
- 
-  // ── Real-time: Listener Socket Anti-Duplikat / Anti-Dobel ────────────────────
- 
+
+  // ── Real-time: Socket (tetap dipertahankan sebagai backup cepat) ──────────
+
   useEffect(() => {
     if (!groupId || !activeChannelId) return;
     const socket = getSocket();
     socket.emit("joinChannel", { group_id: groupId, channel_id: activeChannelId });
- 
+
     const onNew = (payload: ApiChat) => {
       if (String(payload.channel_id) !== String(activeChannelId)) return;
- 
+
       setMessages((prev) => {
-        // 1. Cek apakah pesan dengan ID riil database ini sudah ada di state
         const isAlreadyExists = prev.some((m) => m.id === payload.chat_id);
         if (isAlreadyExists) return prev;
- 
-        // 2. Cek apakah ini pesan kita sendiri yang berstatus data tiruan (optimistic)
+
         const optimisticIndex = prev.findIndex(
-          (m) => m.id.startsWith("opt-") && m.message === payload.chat_message && m.userId === payload.user_id
+          (m) =>
+            m.id.startsWith("opt-") &&
+            m.message === payload.chat_message &&
+            m.userId === payload.user_id
         );
- 
+
         if (optimisticIndex !== -1) {
-          // Jika ketemu data tiruan kita, langsung timpa datanya dengan objek asli dari Socket
           const updatedMessages = [...prev];
           updatedMessages[optimisticIndex] = toMessage(payload, userId);
           return updatedMessages;
         }
- 
-        // 3. Jika pesan murni dari orang lain, append langsung ke paling bawah
+
         return [...prev, toMessage(payload, userId)];
       });
     };
- 
+
     socket.on("chat:new", onNew);
- 
+
     return () => {
       socket.emit("leaveChannel", { group_id: groupId, channel_id: activeChannelId });
       socket.off("chat:new", onNew);
     };
   }, [groupId, activeChannelId, userId]);
- 
+
   // ── Auto scroll ────────────────────────────────────────────────────────────
- 
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
- 
+
   // ── Helpers ────────────────────────────────────────────────────────────────
- 
+
   const initials = (name: string) =>
     (name || "U").trim().split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase();
-    
+
   const slugify = (s: string) =>
     s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
- 
-  // ── Send message (Optimistic UI Only) ──────────────────────────────────────
- 
+
+  // ── Send message (Optimistic UI) ───────────────────────────────────────────
+
   const handleSend = async () => {
     if (!message.trim() || !selectedChannel || !groupId || !userId) return;
     setSendingMsg(true);
- 
+
     const currentMsgText = message.trim();
     const optimisticId = `opt-${Date.now()}`;
- 
+
     const optimistic: Message = {
       id: optimisticId,
       userId,
@@ -247,35 +275,29 @@ export function Chat() {
       time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       isOwn: true,
     };
- 
-    // Munculkan pesan secara instan di layar dengan id sementara 'opt-xxx'
+
     setMessages((prev) => [...prev, optimistic]);
     setMessage("");
- 
+
     try {
-      // Jalankan API HTTP ke backend
       await chatApi.send(groupId, userId, activeChannelId, currentMsgText);
-      
-      // ⚠️ Jangan memanggil fetchMessages() atau melakukan pembaruan state di sini.
-      // Biarkan useEffect Socket.io di atas yang menukar data tiruan secara riil.
-      
+      // Polling / socket akan mengganti data optimistic dengan data riil
     } catch (err: unknown) {
-      // Jika request API gagal, hapus kembali data tiruan tadi dari layar
       setMessages((prev) => prev.filter((m) => m.id !== optimisticId));
       setApiError(err instanceof Error ? err.message : "Gagal mengirim pesan");
     } finally {
       setSendingMsg(false);
     }
   };
- 
-  // ── Edit message ─────────────────────────────────────────────────────────
- 
+
+  // ── Edit message ───────────────────────────────────────────────────────────
+
   const startEdit = (msg: Message) => {
     setEditingMsgId(msg.id);
     setEditingMsgText(msg.message);
   };
   const cancelEdit = () => { setEditingMsgId(null); setEditingMsgText(""); };
- 
+
   const handleSaveEdit = async (msg: Message) => {
     if (!editingMsgText.trim() || editingMsgText === msg.message) { cancelEdit(); return; }
     setSavingEdit(true);
@@ -291,9 +313,9 @@ export function Chat() {
       setSavingEdit(false);
     }
   };
- 
+
   // ── Delete message ─────────────────────────────────────────────────────────
- 
+
   const handleDeleteMessage = async (msg: Message) => {
     try {
       await chatApi.delete(msg.id, userId);
@@ -302,19 +324,19 @@ export function Chat() {
       setApiError(err instanceof Error ? err.message : "Gagal menghapus pesan");
     }
   };
- 
+
   // ── Create channel ─────────────────────────────────────────────────────────
- 
+
   const handleCreateChannel = async () => {
     const trimmedInput = channelName.trim();
     if (!trimmedInput) { setNameError("Channel name cannot be empty."); return; }
     if (trimmedInput.split(/\s+/).length > 3) { setNameError("Maximum limit is 3 words."); return; }
     const slug = slugify(channelName);
     if (channels.some((c) => c.name === slug)) { setNameError(`#${slug} already exists.`); return; }
- 
+
     if (!groupId) { setNameError("No active team selected. Please select a team first."); return; }
     if (!userId)  { setNameError("Session expired. Please log in again."); return; }
- 
+
     setCreatingCh(true);
     try {
       await channelApi.create(groupId, userId, slug);
@@ -328,9 +350,9 @@ export function Chat() {
       setCreatingCh(false);
     }
   };
- 
+
   // ── Delete channel ─────────────────────────────────────────────────────────
- 
+
   const handleDeleteChannel = async (ch: Channel) => {
     try {
       await channelApi.delete(ch.id, groupId, userId);
@@ -339,7 +361,7 @@ export function Chat() {
       setApiError(err instanceof Error ? err.message : "Gagal menghapus channel");
     }
   };
- 
+
   if (teams.length === 0) {
     return (
       <div className="p-6 h-[calc(100vh-8rem)] flex items-center justify-center bg-slate-50 dark:bg-slate-950">
@@ -363,10 +385,10 @@ export function Chat() {
       </div>
     );
   }
- 
+
   return (
     <div className="p-6 bg-slate-50 dark:bg-slate-950 min-h-screen">
- 
+
       {apiError && (
         <div className="mb-3 flex items-center gap-2 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 text-sm px-4 py-2.5 rounded-xl">
           <AlertCircle className="w-4 h-4 shrink-0" />
@@ -376,7 +398,7 @@ export function Chat() {
           </button>
         </div>
       )}
- 
+
       <Dialog open={createOpen} onOpenChange={(open) => {
         setCreateOpen(open);
         if (!open) { setChannelName(""); setNameError(""); }
@@ -388,7 +410,7 @@ export function Chat() {
               Channels are where your team communicates. Keep them focused on a topic.
             </DialogDescription>
           </DialogHeader>
- 
+
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <Label htmlFor="ch-name">Channel Name</Label>
@@ -416,7 +438,7 @@ export function Chat() {
               )}
             </div>
           </div>
- 
+
           <DialogFooter className="gap-2 sm:gap-0">
             <Button
               variant="outline"
@@ -435,18 +457,18 @@ export function Chat() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
- 
+
       <Card className="border-slate-200 dark:border-slate-800 shadow-sm h-[calc(100vh-8rem)] bg-white dark:bg-slate-900 text-slate-900 dark:text-white">
         <CardContent className="p-0 h-full">
           <div className="flex h-full">
- 
+
             {/* ── Left: Channels Sidebar ── */}
             <div className="w-60 border-r border-slate-200 dark:border-slate-800 flex flex-col shrink-0 bg-white dark:bg-slate-900">
               <div className="p-4 border-b border-slate-200 dark:border-slate-800">
                 <h2 className="text-sm font-bold truncate">{activeTeam}</h2>
                 <p className="text-xs text-slate-400 mt-0.5">{members.length} members</p>
               </div>
- 
+
               <ScrollArea className="flex-1">
                 <div className="p-2">
                   <div className="flex items-center justify-between px-3 pt-2 pb-1">
@@ -460,7 +482,7 @@ export function Chat() {
                       <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
- 
+
                   {loadingChannels ? (
                     <p className="text-xs text-slate-400 px-3 py-4 text-center">Loading channels…</p>
                   ) : (
@@ -483,7 +505,7 @@ export function Chat() {
                               <Hash className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-white" : "text-slate-400"}`} />
                               <span className="block truncate w-full" title={ch.name}>{ch.name}</span>
                             </button>
- 
+
                             <AlertDialog>
                               <AlertDialogTrigger asChild>
                                 <button
@@ -526,7 +548,7 @@ export function Chat() {
                 </div>
               </ScrollArea>
             </div>
- 
+
             {/* ── Center: Chat Area ── */}
             <div className="flex-1 flex flex-col min-w-0 bg-slate-50/50 dark:bg-slate-950/20 border-r border-slate-200 dark:border-slate-800">
               {selectedChannel ? (
@@ -537,7 +559,7 @@ export function Chat() {
                       <h3 className="font-semibold truncate">{selectedChannel.name}</h3>
                     </div>
                   </div>
- 
+
                   <div ref={scrollRef} className="flex-1 overflow-y-auto p-5">
                     {loadingMessages ? (
                       <div className="flex items-center justify-center h-full">
@@ -557,13 +579,13 @@ export function Chat() {
                                 {initials(msg.user)}
                               </AvatarFallback>
                             </Avatar>
- 
+
                             <div className={`flex-1 max-w-[70%] ${msg.isOwn ? "flex flex-col items-end" : ""}`}>
                               <div className={`flex items-center gap-2 mb-1 ${msg.isOwn ? "flex-row-reverse" : ""}`}>
                                 <span className="text-xs text-slate-400">{msg.user}</span>
                                 <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{msg.time}</span>
                               </div>
- 
+
                               {editingMsgId === msg.id ? (
                                 <div className="flex items-center gap-2 w-full">
                                   <Input
@@ -600,7 +622,7 @@ export function Chat() {
                                       >
                                         <Pencil className="w-3 h-3" />
                                       </button>
- 
+
                                       <AlertDialog>
                                         <AlertDialogTrigger asChild>
                                           <button className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-950/30 text-slate-400 hover:text-red-500">
@@ -627,7 +649,7 @@ export function Chat() {
                                       </AlertDialog>
                                     </div>
                                   )}
- 
+
                                   <div className={`inline-block px-4 py-2 rounded-xl text-sm ${
                                     msg.isOwn
                                       ? "bg-gradient-to-r from-indigo-600 to-cyan-500 text-white"
@@ -643,7 +665,7 @@ export function Chat() {
                       </div>
                     )}
                   </div>
- 
+
                   <div className="p-4 border-t border-slate-200 dark:border-slate-800 shrink-0 bg-white dark:bg-slate-900">
                     <div className="flex items-center gap-2">
                       <Input
@@ -680,7 +702,7 @@ export function Chat() {
                 </div>
               )}
             </div>
- 
+
             {/* ── Right Sidebar: Members ── */}
             <div className="w-60 flex flex-col shrink-0 bg-white dark:bg-slate-900">
               <div className="p-4 border-b border-slate-200 dark:border-slate-800">
@@ -692,7 +714,7 @@ export function Chat() {
                   </Badge>
                 </div>
               </div>
- 
+
               <ScrollArea className="flex-1 p-2">
                 {members.length === 0 ? (
                   <p className="text-center text-xs text-slate-400 py-8">No members in this team</p>
@@ -703,7 +725,7 @@ export function Chat() {
                       const memName = member.user_full_name || member.name || "Unknown User";
                       const rawRole = String(member.user_role || member.role || member.role_name || member.RoleName || "").toLowerCase();
                       const displayRole = (rawRole === "a" || rawRole.includes("admin")) ? "Admin" : "Member";
- 
+
                       return (
                         <div
                           key={memId}
@@ -729,7 +751,7 @@ export function Chat() {
                 )}
               </ScrollArea>
             </div>
- 
+
           </div>
         </CardContent>
       </Card>

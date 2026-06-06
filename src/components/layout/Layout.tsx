@@ -59,9 +59,30 @@ export function Layout() {
   const [loading, setLoading] = useState<boolean>(true);
   
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
-    return document.documentElement.classList.contains("dark") || 
-           localStorage.getItem("theme") === "dark";
+    // Prioritaskan localStorage sebagai source of truth.
+    // Jika belum ada (null), baru fallback ke class DOM.
+    const saved = localStorage.getItem("theme");
+    if (saved !== null) return saved === "dark";
+    return document.documentElement.classList.contains("dark");
   });
+
+  // Sinkronisasi DOM class dengan localStorage saat pertama mount
+  useEffect(() => {
+    const saved = localStorage.getItem("theme");
+    if (saved === "dark") {
+      document.documentElement.classList.add("dark");
+      setIsDarkMode(true);
+    } else if (saved === "light") {
+      document.documentElement.classList.remove("dark");
+      setIsDarkMode(false);
+    }
+    // Jika null (belum pernah set), biarkan DOM apa adanya dan simpan ke localStorage
+    else {
+      const isDom = document.documentElement.classList.contains("dark");
+      localStorage.setItem("theme", isDom ? "dark" : "light");
+      setIsDarkMode(isDom);
+    }
+  }, []);
 
   // Sinkronisasi mendengarkan event dari Settings.tsx
   useEffect(() => {
