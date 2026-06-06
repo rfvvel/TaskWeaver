@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import {
   Send, Hash, Users, UserPlus, Plus, Trash2, AlertCircle, Pencil, Check, X,
@@ -123,12 +123,11 @@ export function Chat() {
   const [editingMsgText, setEditingMsgText] = useState("");
   const [savingEdit,     setSavingEdit]     = useState(false);
 
-  const scrollRef        = useRef<HTMLDivElement>(null);
-  const inputRef         = useRef<HTMLInputElement>(null);
-  const inputFocused     = useRef(false); // track apakah input sedang focused
-  // Dipakai untuk membedakan load pertama vs polling — hanya load pertama
-  // yang boleh menampilkan spinner "Loading messages…"
-  const initialLoadDone  = useRef(false);
+  const scrollRef            = useRef<HTMLDivElement>(null);
+  const inputRef             = useRef<HTMLInputElement>(null);
+  const inputFocused         = useRef(false);
+  const initialLoadDone      = useRef(false);
+  const shouldScrollToBottom = useRef(false); // sinyal paksa scroll — HANYA set dari channel reset & send
 
   const selectedChannel = channels.find((c) => c.id === activeChannelId);
 
@@ -166,8 +165,9 @@ export function Chat() {
   const fetchMessages = useCallback(async () => {
     if (!groupId || !activeChannelId) return;
 
-    // Hanya tampilkan spinner saat pertama kali load channel ini
-    if (!initialLoadDone.current) {
+    const isInitial = !initialLoadDone.current;
+
+    if (isInitial) {
       setLoadingMessages(true);
     }
 
@@ -175,15 +175,18 @@ export function Chat() {
       const res = await chatApi.getByChannel(groupId, activeChannelId);
       const incoming = (res.data ?? []).map((m) => toMessage(m, userId));
 
+      // Set sinyal scroll SEBELUM setMessages agar useLayoutEffect tangkap saat data sudah ada
+      if (isInitial) {
+        shouldScrollToBottom.current = true;
+      }
+
       setMessages((prev) => {
-        // Pertahankan pesan optimistic (id mulai "opt-") yang belum ada di server
         const optimistics = prev.filter((m) => m.id.startsWith("opt-"));
         const incomingIds = new Set(incoming.map((m) => m.id));
         const pendingOpts = optimistics.filter((o) => !incomingIds.has(o.id));
         return [...incoming, ...pendingOpts];
       });
 
-      // Tandai bahwa load pertama sudah selesai
       initialLoadDone.current = true;
     } catch (err: unknown) {
       setApiError(err instanceof Error ? err.message : "Gagal memuat pesan");
@@ -195,7 +198,7 @@ export function Chat() {
   // Reset + fetch awal saat channel berganti, lalu polling setiap 1 detik
   useEffect(() => {
     setMessages([]);
-    initialLoadDone.current = false; // reset flag agar spinner muncul di channel baru
+    initialLoadDone.current = false; // trigger isInitial = true di fetchMessages berikutnya
     fetchMessages();
 
     const interval = setInterval(() => {
@@ -244,19 +247,25 @@ export function Chat() {
     };
   }, [groupId, activeChannelId, userId]);
 
-  // ── Auto scroll + restore focus setelah polling re-render ─────────────────
+  // ── Auto scroll + restore focus ────────────────────────────────────────────
+  // useLayoutEffect jalan setelah DOM update tapi sebelum browser paint,
+  // sehingga scrollHeight sudah akurat saat kita baca.
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const el = scrollRef.current;
-    if (el) {
-      // Hanya auto-scroll ke bawah kalau user sudah berada di dekat bawah (threshold 80px).
-      // Kalau user sedang scroll ke atas untuk baca pesan lama, jangan ganggu.
+    if (!el) return;
+
+    if (shouldScrollToBottom.current) {
+      // Paksa scroll ke bawah: initial load channel atau kirim pesan sendiri
+      el.scrollTop = el.scrollHeight;
+      shouldScrollToBottom.current = false; // reset sinyal
+    } else {
+      // Polling biasa: hanya scroll kalau user sudah dekat bawah (threshold 80px)
       const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-      if (isNearBottom) {
-        el.scrollTop = el.scrollHeight;
-      }
+      if (isNearBottom) el.scrollTop = el.scrollHeight;
     }
-    // Kalau input sedang focused sebelum polling re-render, kembalikan focus-nya
+
+    // Restore focus input jika sebelumnya sedang focused
     if (inputFocused.current && inputRef.current && document.activeElement !== inputRef.current) {
       inputRef.current.focus();
     }
@@ -296,7 +305,7 @@ export function Chat() {
 
     setMessages((prev) => [...prev, optimistic]);
     setMessage("");
-    scrollToBottom(); // force scroll ke bawah saat kirim pesan sendiri
+    shouldScrollToBottom.current = true; // useLayoutEffect akan scroll ke bawah setelah render
 
     try {
       await chatApi.send(groupId, userId, activeChannelId, currentMsgText);
