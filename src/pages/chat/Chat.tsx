@@ -247,8 +247,14 @@ export function Chat() {
   // ── Auto scroll + restore focus setelah polling re-render ─────────────────
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    const el = scrollRef.current;
+    if (el) {
+      // Hanya auto-scroll ke bawah kalau user sudah berada di dekat bawah (threshold 80px).
+      // Kalau user sedang scroll ke atas untuk baca pesan lama, jangan ganggu.
+      const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+      if (isNearBottom) {
+        el.scrollTop = el.scrollHeight;
+      }
     }
     // Kalau input sedang focused sebelum polling re-render, kembalikan focus-nya
     if (inputFocused.current && inputRef.current && document.activeElement !== inputRef.current) {
@@ -263,6 +269,12 @@ export function Chat() {
 
   const slugify = (s: string) =>
     s.toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "");
+
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  };
 
   // ── Send message (Optimistic UI) ───────────────────────────────────────────
 
@@ -284,6 +296,7 @@ export function Chat() {
 
     setMessages((prev) => [...prev, optimistic]);
     setMessage("");
+    scrollToBottom(); // force scroll ke bawah saat kirim pesan sendiri
 
     try {
       await chatApi.send(groupId, userId, activeChannelId, currentMsgText);

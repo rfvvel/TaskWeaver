@@ -34,3 +34,43 @@
     color: hsl(var(--foreground));
   }
 }
+
+/* ─── Custom Scrollbar — Light & Dark Mode ───────────────────────────────── */
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+/* Chrome, Edge, Safari */
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background-color: #cbd5e1; /* slate-300 */
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: #94a3b8; /* slate-400 */
+}
+
+/* Dark mode overrides */
+.dark * {
+  scrollbar-color: #334155 transparent;
+}
+
+.dark *::-webkit-scrollbar-thumb {
+  background-color: #334155; /* slate-700 */
+}
+
+.dark *::-webkit-scrollbar-thumb:hover {
+  background-color: #475569; /* slate-600 */
+}
