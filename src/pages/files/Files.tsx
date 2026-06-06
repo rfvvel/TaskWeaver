@@ -79,7 +79,6 @@ export function Files() {
     fetchFiles();
   }, [activeTeam, teams]);
 
-  // ✅ FUNGSI BARU UNTUK HAPUS FILE INDIVIDU KE BACKEND
   const handleDeleteFile = async (fileId: string | number, fileName: string) => {
     if (!window.confirm(`Apakah kamu yakin ingin menghapus file "${fileName}"?`)) return;
 
@@ -201,7 +200,6 @@ export function Files() {
 
                   <div className="flex items-center gap-2 pt-2 border-t border-border">
                     <Avatar className="w-6 h-6">
-                      <AvatarImage src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${file.avatar}`} />
                       <AvatarFallback className="text-xs font-bold bg-indigo-100 text-indigo-700">
                         {file.owner.charAt(0).toUpperCase()}
                       </AvatarFallback>
