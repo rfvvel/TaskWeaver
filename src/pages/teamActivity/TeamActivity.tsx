@@ -86,7 +86,6 @@ export function TeamActivity() {
 
   const memberStats = members.map(m => {
     const memId = String(m.user_id || m.UserId);
-    // Cari tugas yang di-assign ke member ini
     const mTasks = teamTasks.filter(t => String(t.user_id || t.UserId) === memId);
     const mTotal = mTasks.length;
     const mComplete = mTasks.filter(t => 
@@ -105,7 +104,6 @@ export function TeamActivity() {
   });
   memberStats.sort((a, b) => b.progress - a.progress);
 
-  // Jika tidak ada tim aktif
   if (!groupId) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] p-8">
@@ -156,13 +154,14 @@ export function TeamActivity() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2 border-border shadow-sm">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        
+        <Card className="lg:col-span-8 border-border shadow-sm">
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
             <CardDescription>Live updates from your team members</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="max-h-[295px] overflow-y-auto pr-2 custom-scrollbar">
             <div className="space-y-4">
               {activities.length > 0 ? activities.map((activity, idx) => (
                 <div key={activity.log_id || idx} className="flex gap-4">
@@ -209,10 +208,10 @@ export function TeamActivity() {
           </CardContent>
         </Card>
 
-        <Card className="border-border shadow-sm h-fit">
+        <Card className="lg:col-span-4 border-border shadow-sm h-fit">
           <CardHeader>
             <CardTitle>Member Progress</CardTitle>
-            <CardDescription>Individual completion rates in this team</CardDescription>
+            <CardDescription>Individual completion rates</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
             {memberStats.length > 0 ? memberStats.map((member, idx) => (
