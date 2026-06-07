@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 
 import Particles from "react-tsparticles";
+import { loadSlim } from "tsparticles-slim";
 
 import LogoTW2 from '../../components/layout/LogoTW2.png';
 
@@ -14,6 +15,10 @@ const loginSchema = z.object({
 });
 
 type LoginFormInputs = z.infer<typeof loginSchema>;
+
+const particlesInit = async (engine: any) => {
+  await loadSlim(engine);
+};
 
 function AnimatedBackground() {
   return (
@@ -34,6 +39,7 @@ function AnimatedBackground() {
       <Particles
         id="loginParticles"
         className="absolute inset-0"
+        init={particlesInit}
         options={{
           background: {
             color: 'transparent',
