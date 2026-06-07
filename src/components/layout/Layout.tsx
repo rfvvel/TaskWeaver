@@ -30,7 +30,7 @@ interface TeamMember {
 }
  
 interface Team {
-  group_id: string; 
+  id: string; 
   name: string;
   description: string;
   inviteCode: string;
@@ -186,7 +186,7 @@ export function Layout() {
  
         if (resData && resData.status === "sukses" && Array.isArray(resData.data)) {
           const baseTeams: Team[] = resData.data.map((t: any) => ({
-            group_id: String(t.group_id ?? ""),
+            id: String(t.group_id ?? ""),
             name: t.group_name ?? t.name ?? "",
             description: t.group_description ?? t.description ?? "",
             inviteCode: t.invite_code ?? "",
@@ -200,7 +200,7 @@ export function Layout() {
                 const mRes = await fetch("http://localhost:3000/api/groupGetMember", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ group_id: team.group_id }),
+                  body: JSON.stringify({ group_id: team.id }),
                 });
                 const mData = await mRes.json();
                 const members: TeamMember[] =

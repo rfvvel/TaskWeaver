@@ -37,7 +37,7 @@ export function Files() {
   useEffect(() => {
     const fetchFiles = async () => {
       const currentTeam = teams?.find((t: any) => t.name === activeTeam);
-      const groupId = currentTeam?.id;
+      const groupId = currentTeam?.id || currentTeam?.group_id;;
       
       if (!groupId) {
         setFiles([]);
@@ -91,7 +91,6 @@ export function Files() {
       
       const json = await res.json();
       if (json.status === "sukses") {
-        // Hapus file dari tampilan layar secara instan
         setFiles(prev => prev.filter(f => f.id !== fileId));
       } else {
         alert("Gagal menghapus file: " + json.pesan);
@@ -199,8 +198,8 @@ export function Files() {
 
                   <div className="flex items-center gap-2 pt-2 border-t border-border">
                     <Avatar className="w-6 h-6">
-                      <AvatarFallback className="text-xs font-bold bg-indigo-100 text-indigo-700">
-                        {file.owner.charAt(0).toUpperCase()}
+                      <AvatarFallback className="text-xs font-bold bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-400">
+                        {(file.owner || "U").charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
@@ -224,7 +223,6 @@ export function Files() {
         <p className="text-muted-foreground">Team file repository for <span className="font-semibold text-indigo-500">{activeTeam}</span></p>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="border-border shadow-sm bg-card">
           <CardContent className="p-4 text-center">
