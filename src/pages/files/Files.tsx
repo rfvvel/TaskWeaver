@@ -59,7 +59,7 @@ export function Files() {
             id: dbFile.file_id,
             name: dbFile.file_name,
             type: dbFile.file_category || "document", 
-            size: "Unknown", 
+            size: dbFile.file_size ? Number(dbFile.file_size) : 0,
             owner: dbFile.uploader_name || "Unknown User",
             avatar: dbFile.uploader_name || "U",
             uploadDate: new Date(dbFile.upload_time).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
@@ -295,10 +295,6 @@ export function Files() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        {/* <Button variant="outline" className="gap-2 rounded-xl bg-card border-border text-foreground hover:bg-accent">
-          <Filter className="w-4 h-4" />
-          Filter
-        </Button> */}
       </div>
 
       <Tabs defaultValue="all" className="space-y-4">
