@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
   Plus, Edit, Trash2, Calendar as CalendarIcon, ListChecks,
-  Users, Sparkles, Loader2, UploadCloud, FileText, X, Paperclip, RefreshCw
+  Users, Sparkles, Loader2, FileText, X, Paperclip, RefreshCw
 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";

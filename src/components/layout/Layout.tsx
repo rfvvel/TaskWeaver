@@ -320,7 +320,7 @@ export function Layout() {
                 <DropdownMenuSeparator />
                 {teams.map((team, idx) => (
                   <DropdownMenuItem
-                    key={team.group_id || idx}
+                    key={team.id || idx}
                     onClick={() => handleTeamChange(team.name)}
                     className="cursor-pointer font-medium"
                   >

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import {
   TrendingUp, Users, Target, Calendar as CalendarIcon,
   Brain, CheckCircle2, Clock, Shuffle, UserPlus,
-  Activity, ChevronRight, ListChecks, ArrowUpRight, Loader2
+  Activity, ChevronRight, ListChecks, Loader2
 } from "lucide-react";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../../components/ui/card";

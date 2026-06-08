@@ -268,12 +268,6 @@ export function Chat() {
     return new Date(dateStr).toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
   };
 
-  const scrollToBottom = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  };
-
   const handleSend = async () => {
     if (!message.trim() || !selectedChannel || !groupId || !userId) return;
     setSendingMsg(true);
