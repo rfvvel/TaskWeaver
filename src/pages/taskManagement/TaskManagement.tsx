@@ -169,7 +169,7 @@ export function TaskManagement() {
   const [loadingSubtasks, setLoadingSubtasks] = useState(false);
   const [isGeneratingAI, setIsGeneratingAI] = useState(false);
   const [isRebalancing, setIsRebalancing] = useState(false);
-  const [members, setMembers] = useState<Member[]>([]);
+  const [_members, setMembers] = useState<Member[]>([]);
   
   const [taskNameError, setTaskNameError] = useState("");
   const [taskDescError, setTaskDescError] = useState("");
