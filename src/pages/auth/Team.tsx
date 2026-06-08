@@ -96,6 +96,7 @@ export function Team() {
 
     try {
       const resCheck = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/groupGetGroupbyInviteCode", {
+        method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ invite_code: joinCode })
       });
