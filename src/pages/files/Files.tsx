@@ -33,11 +33,12 @@ export function Files() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [openDropdownId, setOpenDropdownId] = useState<string | number | null>(null);
 
   useEffect(() => {
     const fetchFiles = async () => {
       const currentTeam = teams?.find((t: any) => t.name === activeTeam);
-      const groupId = currentTeam?.id || currentTeam?.group_id;;
+      const groupId = currentTeam?.id || currentTeam?.group_id;
       
       if (!groupId) {
         setFiles([]);
@@ -165,25 +166,59 @@ export function Files() {
                     <h4 className="font-medium text-sm text-foreground truncate flex-1" title={file.name}>
                       {file.name}
                     </h4>
-                    <DropdownMenu>
+                    
+                    <DropdownMenu 
+                      open={openDropdownId === file.id} 
+                      onOpenChange={(open) => {
+                        if (!open) setOpenDropdownId(null);
+                        else setOpenDropdownId(file.id);
+                      }}
+                    >
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-foreground transition-opacity">
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 opacity-0 group-hover:opacity-100 data-[state=open]:opacity-100 bg-background hover:bg-accent transition-all duration-200 focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:outline-none"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <MoreVertical className="w-4 h-4" />
                         </Button>
                       </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="bg-card border-border text-foreground">
-                        <DropdownMenuItem className="hover:bg-accent cursor-pointer" onClick={() => handleDownload(file.url)}>
-                          <Eye className="w-4 h-4 mr-2" />Preview
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="hover:bg-accent cursor-pointer" onClick={() => handleDownload(file.url)}>
-                          <Download className="w-4 h-4 mr-2" />Download
-                        </DropdownMenuItem>
-                        
+                      <DropdownMenuContent 
+                        align="end" 
+                        className="bg-popover border-border text-foreground shadow-lg z-50 min-w-[140px] focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:outline-none"
+                        sideOffset={5}
+                        avoidCollisions={true}
+                      >
                         <DropdownMenuItem 
-                          className="hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 cursor-pointer focus:text-red-600"
-                          onClick={() => handleDeleteFile(file.id, file.name)}
+                          className="hover:bg-accent cursor-pointer focus:outline-none"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload(file.url);
+                          }}
                         >
-                          <Trash2 className="w-4 h-4 mr-2" />Delete
+                          <Eye className="w-4 h-4 mr-2" />
+                          Preview
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="hover:bg-accent cursor-pointer focus:outline-none"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownload(file.url);
+                          }}
+                        >
+                          <Download className="w-4 h-4 mr-2" />
+                          Download
+                        </DropdownMenuItem>
+                        <DropdownMenuItem 
+                          className="hover:bg-red-50 dark:hover:bg-red-950/30 text-red-600 dark:text-red-400 cursor-pointer focus:text-red-600 focus:outline-none"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteFile(file.id, file.name);
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
