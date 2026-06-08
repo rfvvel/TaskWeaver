@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { File, FileText, Image, FileCode, Download, Eye, MoreVertical, Search, Filter, FolderOpen, Trash2, Loader2 } from "lucide-react";
+import { File, FileText, Image, FileCode, Download, Eye, MoreVertical, Search, FolderOpen, Trash2, Loader2 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -225,7 +225,7 @@ export function Files() {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">{file.size}</span>
+                    {/* <span className="text-xs text-muted-foreground">{file.size}</span> */}
                     <Badge variant="secondary" className="text-[10px] font-normal capitalize bg-muted text-muted-foreground border-0">
                       {file.category}
                     </Badge>
@@ -295,10 +295,6 @@ export function Files() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="gap-2 rounded-xl bg-card border-border text-foreground hover:bg-accent">
-          <Filter className="w-4 h-4" />
-          Filter
-        </Button>
       </div>
 
       <Tabs defaultValue="all" className="space-y-4">
