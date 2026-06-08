@@ -31,7 +31,7 @@ export function Calendar() {
          return;
       }
       try {
-        const res = await fetch("http://localhost:3000/api/detailTaskGetByGroup", {
+        const res = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/detailTaskGetByGroup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ group_id: groupId })

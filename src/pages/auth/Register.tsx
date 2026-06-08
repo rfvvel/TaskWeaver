@@ -107,7 +107,7 @@ export default function RegisterPage() {
     setServerError("");
 
     try {
-      const response = await fetch("http://localhost:3000/api/register", {
+      const response = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -22,7 +22,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../../components/ui/pop
 import { format, startOfMonth, endOfMonth, startOfWeek, endOfWeek, addDays, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
-const API = "http://localhost:3000/api";
+const API = "https://projecttaskweaverbackend-production.up.railway.app/api";
 
 interface SubTask {
   detail_task_id: number;

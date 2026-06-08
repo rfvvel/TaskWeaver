@@ -175,7 +175,7 @@ export function Layout() {
     const fetchUserTeams = async () => {
       setLoading(true);
       try {
-        const response = await fetch("http://localhost:3000/api/groupGetGroupByUserId", {
+        const response = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/groupGetGroupByUserId", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ user_id: currentUser.user_id }),
@@ -197,7 +197,7 @@ export function Layout() {
           const teamsWithMembers: Team[] = await Promise.all(
             baseTeams.map(async (team) => {
               try {
-                const mRes = await fetch("http://localhost:3000/api/groupGetMember", {
+                const mRes = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/groupGetMember", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify({ group_id: team.id }),

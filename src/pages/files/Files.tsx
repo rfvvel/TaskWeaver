@@ -46,7 +46,7 @@ export function Files() {
 
       setLoading(true);
       try {
-        const res = await fetch("http://localhost:3000/api/getTaskFilesByGroup", {
+        const res = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/getTaskFilesByGroup", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ group_id: groupId })
@@ -83,7 +83,7 @@ export function Files() {
     if (!window.confirm(`Apakah kamu yakin ingin menghapus file "${fileName}"?`)) return;
 
     try {
-      const res = await fetch("http://localhost:3000/api/deleteTaskFile", {
+      const res = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/deleteTaskFile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ file_id: fileId })

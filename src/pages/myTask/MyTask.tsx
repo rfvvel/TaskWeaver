@@ -9,7 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../components/ui/ta
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../../components/ui/dialog";
 import { format } from "date-fns";
 
-const API = "http://localhost:3000/api";
+const API = "https://projecttaskweaverbackend-production.up.railway.app/api";
 
 interface MyTask {
   id: number;

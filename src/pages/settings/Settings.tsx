@@ -162,7 +162,7 @@ export function Settings() {
     setIsSavingProfile(true);
     setProfileMsg(null);
     try {
-      const res = await fetch("http://localhost:3000/api/userUpdate", {
+      const res = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/userUpdate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId, user_full_name: fullName, user_email: email, user_phone_number: phone }),
@@ -193,7 +193,7 @@ export function Settings() {
 
   useEffect(() => {
     if (!userId) return;
-    fetch("http://localhost:3000/api/userGetSkill", {
+    fetch("https://projecttaskweaverbackend-production.up.railway.app/api/userGetSkill", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: userId }),
@@ -213,7 +213,7 @@ export function Settings() {
     setIsSavingSkills(true);
     setSkillMsg(null);
     try {
-      const res = await fetch("http://localhost:3000/api/userUISkill", {
+      const res = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/userUISkill", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId, user_skill: skillsToString(updated) }),
@@ -267,7 +267,7 @@ export function Settings() {
     }
     setIsSavingPwd(true);
     try {
-      const res = await fetch("http://localhost:3000/api/userUpdatePassword", {
+      const res = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/userUpdatePassword", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId, old_password: currentPassword, new_password: newPassword }),

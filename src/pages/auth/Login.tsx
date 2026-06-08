@@ -98,8 +98,7 @@ export default function LoginPage() {
     setServerError("");
 
     try {
-      const response = await fetch("http://localhost:3000/api/login", {
-        method: "POST",
+      const response = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/login", {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: data.email,
@@ -123,7 +122,7 @@ export default function LoginPage() {
 
       try {
         const groupRes = await fetch(
-          "http://localhost:3000/api/groupGetGroupByUserId",
+          "https://projecttaskweaverbackend-production.up.railway.app/api/groupGetGroupByUserId",
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

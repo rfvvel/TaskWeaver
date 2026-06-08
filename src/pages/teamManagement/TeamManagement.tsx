@@ -75,7 +75,7 @@ export function TeamManagement() {
     }
 
     try {
-      const response = await fetch("http://localhost:3000/api/groupGetGroupByUserId", {
+      const response = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/groupGetGroupByUserId", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ user_id: userId })
@@ -89,7 +89,7 @@ export function TeamManagement() {
           let bigTasksList: BigTask[] = [];
 
           try {
-            const memRes = await fetch("http://localhost:3000/api/groupGetMember", {
+            const memRes = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/groupGetMember", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ group_id: g.group_id })
@@ -111,7 +111,7 @@ export function TeamManagement() {
           }
 
           try {
-            const taskRes = await fetch("http://localhost:3000/api/taskGetByGroup", {
+            const taskRes = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/taskGetByGroup", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ Group_Id: g.group_id })
@@ -133,7 +133,7 @@ export function TeamManagement() {
           let inviteCode = g.group_invite_code || g.group_invitecode || g.invite_code || null;
           if (!inviteCode) {
             try {
-              const invRes = await fetch("http://localhost:3000/api/groupGetInviteCode", {
+              const invRes = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/groupGetInviteCode", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ group_id: g.group_id })
@@ -210,7 +210,7 @@ export function TeamManagement() {
     }
 
     try {
-      const response = await fetch("http://localhost:3000/api/groupKick", {
+      const response = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/groupKick", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -273,7 +273,7 @@ export function TeamManagement() {
     setJoinCodeError("");
 
     try {
-      const resCheck = await fetch("http://localhost:3000/api/groupGetGroupbyInviteCode", {
+      const resCheck = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/groupGetGroupbyInviteCode", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ invite_code: inviteCodeInput.toUpperCase() })
@@ -288,7 +288,7 @@ export function TeamManagement() {
 
       const groupId = resultCheck.data.group_id || resultCheck.data.id;
 
-      const resJoin = await fetch("http://localhost:3000/api/groupJoin", {
+      const resJoin = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/groupJoin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ group_id: groupId, user_id: userId, user_role: "M" })
@@ -343,7 +343,7 @@ export function TeamManagement() {
         invite_code: generatedCode
       });
 
-      const response = await fetch("http://localhost:3000/api/groupCreate", {
+      const response = await fetch("https://projecttaskweaverbackend-production.up.railway.app/api/groupCreate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"

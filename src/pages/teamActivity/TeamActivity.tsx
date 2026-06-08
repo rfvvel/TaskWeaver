@@ -7,7 +7,7 @@ import { Badge } from "../../components/ui/badge";
 import { Progress } from "../../components/ui/progress";
 import { Button } from "../../components/ui/button";
 
-const API = "http://localhost:3000/api";
+const API = "https://projecttaskweaverbackend-production.up.railway.app/api";
 
 function ActivityDot({ type }: { type: string }) {
   const isStarted = type?.toLowerCase().includes("in-progress") || type?.toLowerCase().includes("start");

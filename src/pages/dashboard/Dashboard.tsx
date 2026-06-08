@@ -13,7 +13,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Avatar, AvatarFallback } from "../../components/ui/avatar";
 import { Progress } from "../../components/ui/progress";
 
-const API = "http://localhost:3000/api";
+const API = "https://projecttaskweaverbackend-production.up.railway.app/api";
 
 interface MyTask {
   id: number;
