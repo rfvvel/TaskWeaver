@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useOutletContext } from "react-router-dom";
-import { File, FileText, Image, FileCode, Download, Eye, MoreVertical, Search, FolderOpen, Trash2, Loader2 } from "lucide-react";
+import { File, FileText, Image, FileCode, Download, Eye, MoreVertical, Search, Filter, FolderOpen, Trash2, Loader2 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Input } from "../../components/ui/input";
@@ -18,24 +18,13 @@ interface FileItem {
   id: number | string;
   name: string;
   type: string;
-  size: number | string; 
+  size: string;
   owner: string;
   avatar: string;
   uploadDate: string;
   status: string;
   category: string;
   url: string; 
-}
-
-function formatFileSize(bytes: number | string) {
-  const numericBytes = Number(bytes);
-  if (!numericBytes || isNaN(numericBytes) || numericBytes === 0) return "0 Bytes";
-  
-  const k = 1024;
-  const sizes = ["Bytes", "KB", "MB", "GB"];
-  const i = Math.floor(Math.log(numericBytes) / Math.log(k));
-  
-  return parseFloat((numericBytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
 export function Files() {
@@ -70,7 +59,7 @@ export function Files() {
             id: dbFile.file_id,
             name: dbFile.file_name,
             type: dbFile.file_category || "document", 
-            size: dbFile.file_size ? Number(dbFile.file_size) : 0,
+            size: "Unknown", 
             owner: dbFile.uploader_name || "Unknown User",
             avatar: dbFile.uploader_name || "U",
             uploadDate: new Date(dbFile.upload_time).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
@@ -82,7 +71,7 @@ export function Files() {
           setFiles(mappedFiles);
         }
       } catch (err) {
-        console.error("Gagal menarik data file:", err);
+        console.error("Failed to pull data size:", err);
       } finally {
         setLoading(false);
       }
@@ -140,8 +129,7 @@ export function Files() {
   const filteredFiles = search.trim() ? files.filter(f => f.name.toLowerCase().includes(search.toLowerCase())) : files;
   
   const totalFiles = files.length;
-  const totalBytes = files.reduce((acc, file) => acc + (typeof file.size === 'number' ? file.size : 0), 0);
-  const storageUsedMB = (totalBytes / (1024 * 1024)).toFixed(2);
+  const storageUsedMB = (files.length * 1.5).toFixed(1); 
   const categoriesCount = new Set(files.map(f => f.category)).size;
 
   const FileGrid = ({ data }: { data: FileItem[] }) => {
@@ -237,7 +225,7 @@ export function Files() {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">{formatFileSize(file.size)}</span>
+                    <span className="text-xs text-muted-foreground">{file.size}</span>
                     <Badge variant="secondary" className="text-[10px] font-normal capitalize bg-muted text-muted-foreground border-0">
                       {file.category}
                     </Badge>
@@ -307,6 +295,10 @@ export function Files() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <Button variant="outline" className="gap-2 rounded-xl bg-card border-border text-foreground hover:bg-accent">
+          <Filter className="w-4 h-4" />
+          Filter
+        </Button>
       </div>
 
       <Tabs defaultValue="all" className="space-y-4">
