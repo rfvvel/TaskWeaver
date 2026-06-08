@@ -18,13 +18,24 @@ interface FileItem {
   id: number | string;
   name: string;
   type: string;
-  size: string;
+  size: number | string; 
   owner: string;
   avatar: string;
   uploadDate: string;
   status: string;
   category: string;
   url: string; 
+}
+
+function formatFileSize(bytes: number | string) {
+  const numericBytes = Number(bytes);
+  if (!numericBytes || isNaN(numericBytes) || numericBytes === 0) return "0 Bytes";
+  
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(numericBytes) / Math.log(k));
+  
+  return parseFloat((numericBytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
 }
 
 export function Files() {
@@ -129,7 +140,8 @@ export function Files() {
   const filteredFiles = search.trim() ? files.filter(f => f.name.toLowerCase().includes(search.toLowerCase())) : files;
   
   const totalFiles = files.length;
-  const storageUsedMB = (files.length * 1.5).toFixed(1); 
+  const totalBytes = files.reduce((acc, file) => acc + (typeof file.size === 'number' ? file.size : 0), 0);
+  const storageUsedMB = (totalBytes / (1024 * 1024)).toFixed(2);
   const categoriesCount = new Set(files.map(f => f.category)).size;
 
   const FileGrid = ({ data }: { data: FileItem[] }) => {
@@ -225,7 +237,7 @@ export function Files() {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">{file.size}</span>
+                    <span className="text-xs text-muted-foreground">{formatFileSize(file.size)}</span>
                     <Badge variant="secondary" className="text-[10px] font-normal capitalize bg-muted text-muted-foreground border-0">
                       {file.category}
                     </Badge>
