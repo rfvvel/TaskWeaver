@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useOutletContext } from "react-router-dom";
 import {
   Plus, Edit, Trash2, Calendar as CalendarIcon, ListChecks,
-  Users, Sparkles, Loader2, FileText, X, Paperclip, RefreshCw
+  Users, Sparkles, Loader2, RefreshCw
 } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
@@ -174,9 +174,6 @@ export function TaskManagement() {
   const [taskNameError, setTaskNameError] = useState("");
   const [taskDescError, setTaskDescError] = useState("");
   
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [taskFile, setTaskFile] = useState<File | null>(null);
-
   const emptyForm = {
     TaskName: "", TaskDescription: "", TaskComplexity: 5,
     TaskDeadline: new Date().toISOString(), TaskPrerequisite: null as number | null,
@@ -451,8 +448,7 @@ export function TaskManagement() {
   };
 
   const resetForm = () => {
-    setFormData(emptyForm);
-    setTaskFile(null); 
+    setFormData(emptyForm); 
     setTaskNameError("");
     setTaskDescError("");
   };
@@ -466,7 +462,6 @@ export function TaskManagement() {
       TaskDeadline: task.TaskDeadline,
       TaskPrerequisite: task.TaskPrerequisite,
     });
-    setTaskFile(null);
     setTaskNameError("");
     setTaskDescError("");
     setDialogOpen(true);
@@ -478,16 +473,8 @@ export function TaskManagement() {
     setDialogOpen(true);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setTaskFile(e.target.files[0]);
-    }
-  };
-
-  // ─────────────────────────────────────────────────────────────
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-slate-50">Task Management</h1>
@@ -504,7 +491,6 @@ export function TaskManagement() {
         </Button>
       </div>
 
-      {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="rounded-2xl max-w-2xl max-h-[90vh] overflow-y-auto bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-50 border dark:border-slate-800">
           <DialogHeader>
@@ -532,36 +518,6 @@ export function TaskManagement() {
                 className={`rounded-xl min-h-[100px] dark:bg-slate-950 dark:border-slate-800 ${taskDescError ? "border-red-500 focus-visible:ring-red-500" : ""}`} />
               {taskDescError && <p className="text-xs text-red-500 mt-1">{taskDescError}</p>}
             </div>
-            
-            {/* <div className="space-y-2">
-              <Label>Attachment (Optional)</Label>
-              <div className="flex items-center gap-3">
-                <input 
-                  type="file" 
-                  ref={fileInputRef} 
-                  className="hidden" 
-                  onChange={handleFileChange}
-                />
-                <Button 
-                  type="button" 
-                  variant="outline" 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="rounded-xl border-dashed border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400"
-                >
-                  <Paperclip className="w-4 h-4 mr-2" />
-                  Select File
-                </Button>
-                {taskFile && (
-                  <Badge variant="secondary" className="flex items-center gap-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300 px-3 py-1">
-                    <FileText className="w-3 h-3" />
-                    <span className="truncate max-w-[150px]">{taskFile.name}</span>
-                    <button type="button" onClick={() => setTaskFile(null)} className="ml-1 hover:text-red-500">
-                      <X className="w-3 h-3" />
-                    </button>
-                  </Badge>
-                )}
-              </div>
-            </div> */}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
