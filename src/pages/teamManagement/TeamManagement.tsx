@@ -323,7 +323,6 @@ export function TeamManagement() {
       return;
     }
 
-    // FIX: use robust resolveUserId — this was the primary cause of data not saving
     const userId = resolveUserId(loggedInUser);
     if (!userId) {
       alert(`Gagal mendapatkan User ID. Data user di localStorage: ${JSON.stringify(loggedInUser)}. Coba logout dan login kembali.`);
@@ -372,12 +371,12 @@ export function TeamManagement() {
         alert("Tim baru berhasil dibuat dan disimpan ke database!");
       } else {
         const errorMsg = result.pesan || result.message || "Gagal membuat tim. Cek console untuk detail.";
-        alert(`Gagal membuat tim: ${errorMsg}`);
+        alert(`Create team failed: ${errorMsg}`);
         console.error("[TeamManagement] Create team failed:", result);
       }
     } catch (error) {
       console.error("Error Create Team:", error);
-      alert("Gagal terhubung ke server backend. Pastikan server backend Anda berjalan di port 3000 dan CORS diizinkan.");
+      alert("Failed to connect to backend server. Make sure your backend server is running on port 3000 and CORS is allowed.");
     } finally {
       setIsCreating(false);
     }

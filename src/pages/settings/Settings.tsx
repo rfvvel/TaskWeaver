@@ -366,7 +366,7 @@ export function Settings() {
 
               {profileMsg && (
                 <p className={`text-sm font-medium ${profileMsg.ok ? "text-green-600" : "text-red-500"}`}>
-                  {profileMsg.ok ? "✓" : "⚠"} {profileMsg.text}
+                  {profileMsg.ok ? "" : ""} {profileMsg.text}
                 </p>
               )}
 
@@ -522,7 +522,7 @@ export function Settings() {
 
               {pwdMsg && (
                 <p className={`text-sm font-medium ${pwdMsg.ok ? "text-green-600" : "text-red-500"}`}>
-                  {pwdMsg.ok ? "✓" : "⚠"} {pwdMsg.text}
+                  {pwdMsg.ok ? "" : ""} {pwdMsg.text}
                 </p>
               )}
 

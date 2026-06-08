@@ -295,10 +295,10 @@ export function Files() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <Button variant="outline" className="gap-2 rounded-xl bg-card border-border text-foreground hover:bg-accent">
+        {/* <Button variant="outline" className="gap-2 rounded-xl bg-card border-border text-foreground hover:bg-accent">
           <Filter className="w-4 h-4" />
           Filter
-        </Button>
+        </Button> */}
       </div>
 
       <Tabs defaultValue="all" className="space-y-4">

@@ -34,13 +34,13 @@ export function Team() {
 
   const handleCreateTeam = async () => {
     if (!teamName.trim()) {
-      setTeamNameError("Team Name tidak boleh kosong!");
+      setTeamNameError("Team Name cannot be empty!");
       return; 
     }
 
     const user = getLoggedInUser();
     if (!user) {
-      alert("Sesi login tidak ditemukan. Silakan login ulang.");
+      // alert("Sesi login tidak ditemukan. Silakan login ulang.");
       navigate("/login");
       return;
     }
@@ -68,7 +68,7 @@ export function Team() {
         localStorage.setItem("tw_activeTeam", teamName);
         navigate("/team-management");
       } else {
-        setTeamNameError(result.pesan || "Gagal membuat tim.");
+        setTeamNameError(result.pesan || "Failed to create a team.");
       }
     } catch (error) {
       console.error("Error Create Team:", error);
@@ -86,7 +86,7 @@ export function Team() {
 
     const user = getLoggedInUser();
     if (!user) {
-      alert("Sesi login tidak ditemukan. Silakan login ulang.");
+      // alert("Sesi login tidak ditemukan. Silakan login ulang.");
       navigate("/login");
       return;
     }
@@ -104,7 +104,7 @@ export function Team() {
       const resultCheck = await resCheck.json();
 
       if (!resCheck.ok || !resultCheck.data) {
-        setJoinCodeError(resultCheck.pesan || "Invite Code tidak ditemukan atau tidak valid.");
+        setJoinCodeError(resultCheck.pesan || "Invite Code not found or invalid.");
         setIsJoining(false);
         return;
       }
@@ -124,15 +124,14 @@ export function Team() {
       const resultJoin = await resJoin.json();
 
       if (resJoin.ok) {
-        alert("Berhasil bergabung ke dalam tim!");
         navigate("/team-management");
       } else {
-        setJoinCodeError(resultJoin.pesan || "Gagal bergabung ke tim.");
+        setJoinCodeError(resultJoin.pesan || "Failed to join a team.");
       }
 
     } catch (error) {
       console.error("Error Join Team:", error);
-      setJoinCodeError("Tidak bisa terhubung ke server backend.");
+      setJoinCodeError("Unable to connect to backend server.");
     } finally {
       setIsJoining(false);
     }

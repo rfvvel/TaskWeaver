@@ -123,15 +123,15 @@ export default function RegisterPage() {
       const result = await response.json();
 
       if (response.ok) {
-        alert(result.pesan || "Register Berhasil!");
+        // alert(result.pesan || "Register Berhasil!");
         navigate('/login');
       } else {
-        setServerError(result.pesan || "Gagal melakukan pendaftaran.");
+        setServerError(result.pesan || "Failed to register.");
       }
     } catch (error) {
-      console.error("Gagal koneksi ke backend:", error);
+      console.error("Failed to connect to backend:", error);
       setServerError(
-        "Tidak bisa terhubung ke server. Pastikan backend sudah menyala."
+        "Unable to connect to server. Make sure the backend is running."
       );
     } finally {
       setIsLoading(false);

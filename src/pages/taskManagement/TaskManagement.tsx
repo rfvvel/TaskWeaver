@@ -272,8 +272,8 @@ export function TaskManagement() {
 
   const handleCreateTask = async () => {
     let hasError = false;
-    if (!formData.TaskName.trim()) { setTaskNameError("Task Title wajib diisi!"); hasError = true; }
-    if (!formData.TaskDescription.trim()) { setTaskDescError("Description wajib diisi!"); hasError = true; }
+    if (!formData.TaskName.trim()) { setTaskNameError("Task Title Required!"); hasError = true; }
+    if (!formData.TaskDescription.trim()) { setTaskDescError("Description Required!"); hasError = true; }
     
     if (hasError) return;
 
@@ -398,7 +398,7 @@ export function TaskManagement() {
       }
     } catch (err) {
       console.error("Gagal AI breakdown:", err);
-      alert("Terjadi kesalahan saat menghubungi AI.");
+      // alert("Terjadi kesalahan saat menghubungi AI.");
     } finally {
       setIsGeneratingAI(false);
     }
@@ -533,7 +533,7 @@ export function TaskManagement() {
               {taskDescError && <p className="text-xs text-red-500 mt-1">{taskDescError}</p>}
             </div>
             
-            <div className="space-y-2">
+            {/* <div className="space-y-2">
               <Label>Attachment (Optional)</Label>
               <div className="flex items-center gap-3">
                 <input 
@@ -561,7 +561,7 @@ export function TaskManagement() {
                   </Badge>
                 )}
               </div>
-            </div>
+            </div> */}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
